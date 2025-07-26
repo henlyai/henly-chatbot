@@ -20,7 +20,10 @@ function PanelNavigation({
   const localize = useLocalize();
   return (
     <>
-      <div className="flex gap-2">{!isChatRoute && <ThemeSelector returnThemeOnly={true} />}</div>
+      <div className="flex gap-2">
+        {/* ThemeSelector hidden for ScaleWize AI - forced light mode */}
+        {/* {!isChatRoute && <ThemeSelector returnThemeOnly={true} />} */}
+      </div>
       <div
         className="flex items-center justify-between gap-2"
         role="navigation"

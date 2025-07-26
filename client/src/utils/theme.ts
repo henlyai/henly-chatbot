@@ -22,6 +22,11 @@ export const applyFontSize = (val: string) => {
 };
 
 export const getInitialTheme = () => {
+  // Force light theme for ScaleWize AI
+  return 'light';
+  
+  // Original code commented out to force light mode
+  /*
   if (typeof window !== 'undefined' && window.localStorage) {
     const storedPrefs = window.localStorage.getItem('color-theme');
     if (typeof storedPrefs === 'string') {
@@ -35,4 +40,5 @@ export const getInitialTheme = () => {
   }
 
   return 'light'; // light theme as the default;
+  */
 };

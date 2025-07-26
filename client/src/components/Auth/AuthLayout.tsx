@@ -70,7 +70,8 @@ function AuthLayout({
       </BlinkAnimation>
       <DisplayError />
       <div className="absolute bottom-0 left-0 md:m-4">
-        <ThemeSelector />
+        {/* ThemeSelector hidden for ScaleWize AI - forced light mode */}
+        {/* <ThemeSelector /> */}
       </div>
 
       <div className="flex flex-grow items-center justify-center">

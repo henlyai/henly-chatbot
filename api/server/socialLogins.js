@@ -39,38 +39,38 @@ const configureSocialLogins = async (app) => {
   if (process.env.APPLE_CLIENT_ID && process.env.APPLE_PRIVATE_KEY_PATH) {
     passport.use(appleLogin());
   }
-  if (
-    process.env.OPENID_CLIENT_ID &&
-    process.env.OPENID_CLIENT_SECRET &&
-    process.env.OPENID_ISSUER &&
-    process.env.OPENID_SCOPE &&
-    process.env.OPENID_SESSION_SECRET
-  ) {
-    logger.info('Configuring OpenID Connect...');
-    const sessionOptions = {
-      secret: process.env.OPENID_SESSION_SECRET,
-      resave: false,
-      saveUninitialized: false,
-    };
-    if (isEnabled(process.env.USE_REDIS)) {
-      logger.debug('Using Redis for session storage in OpenID...');
-      const keyv = new Keyv({ store: keyvRedis });
-      const client = keyv.opts.store.client;
-      sessionOptions.store = new RedisStore({ client, prefix: 'openid_session' });
-    } else {
-      sessionOptions.store = new MemoryStore({
-        checkPeriod: 86400000, // prune expired entries every 24h
-      });
-    }
-    app.use(session(sessionOptions));
-    app.use(passport.session());
-    const config = await setupOpenId();
-    if (isEnabled(process.env.OPENID_REUSE_TOKENS)) {
-      logger.info('OpenID token reuse is enabled.');
-      passport.use('openidJwt', openIdJwtLogin(config));
-    }
-    logger.info('OpenID Connect configured.');
-  }
+  // if (
+  //   process.env.OPENID_CLIENT_ID &&
+  //   process.env.OPENID_CLIENT_SECRET &&
+  //   process.env.OPENID_ISSUER &&
+  //   process.env.OPENID_SCOPE &&
+  //   process.env.OPENID_SESSION_SECRET
+  // ) {
+  //   logger.info('Configuring OpenID Connect...');
+  //   const sessionOptions = {
+  //     secret: process.env.OPENID_SESSION_SECRET,
+  //     resave: false,
+  //     saveUninitialized: false,
+  //   };
+  //   if (isEnabled(process.env.USE_REDIS)) {
+  //     logger.debug('Using Redis for session storage in OpenID...');
+  //     const keyv = new Keyv({ store: keyvRedis });
+  //     const client = keyv.opts.store.client;
+  //     sessionOptions.store = new RedisStore({ client, prefix: 'openid_session' });
+  //   } else {
+  //     sessionOptions.store = new MemoryStore({
+  //       checkPeriod: 86400000, // prune expired entries every 24h
+  //     });
+  //   }
+  //   app.use(session(sessionOptions));
+  //   app.use(passport.session());
+  //   const config = await setupOpenId();
+  //   if (isEnabled(process.env.OPENID_REUSE_TOKENS)) {
+  //     logger.info('OpenID token reuse is enabled.');
+  //     passport.use('openidJwt', openIdJwtLogin(config));
+  //   }
+  //   logger.info('OpenID Connect configured.');
+  // }
   if (
     process.env.SAML_ENTRY_POINT &&
     process.env.SAML_ISSUER &&

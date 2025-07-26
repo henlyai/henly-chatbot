@@ -1,9 +1,11 @@
 const express = require('express');
+console.log('[DEBUG] auth.js router loaded');
 const {
   refreshController,
   registrationController,
   resetPasswordController,
   resetPasswordRequestController,
+  ssoLibreChatController,
 } = require('~/server/controllers/AuthController');
 const { loginController } = require('~/server/controllers/auth/LoginController');
 const { logoutController } = require('~/server/controllers/auth/LogoutController');
@@ -31,6 +33,12 @@ const {
 } = require('~/server/middleware');
 
 const router = express.Router();
+
+// Debug log for all requests to this router
+router.use((req, res, next) => {
+  console.log(`[DEBUG] /api/auth route hit: ${req.method} ${req.originalUrl}`);
+  next();
+});
 
 const ldapAuth = !!process.env.LDAP_URL && !!process.env.LDAP_USER_SEARCH_BASE;
 //Local
@@ -68,5 +76,11 @@ router.post('/2fa/verify-temp', checkBan, verify2FAWithTempToken);
 router.post('/2fa/confirm', requireJwtAuth, confirm2FA);
 router.post('/2fa/disable', requireJwtAuth, disable2FA);
 router.post('/2fa/backup/regenerate', requireJwtAuth, regenerateBackupCodes);
+
+// Register SSO proxy endpoint for LibreChat
+router.post('/sso/librechat', (req, res, next) => {
+  console.log('[DEBUG] POST /api/auth/sso/librechat route hit');
+  next();
+}, ssoLibreChatController);
 
 module.exports = router;

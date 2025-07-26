@@ -12,6 +12,7 @@ const { isEnabled } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 const mongoSanitize = require('express-mongo-sanitize');
 const { connectDb, indexSync } = require('~/db');
+const https = require('https');
 
 const validateImageRequest = require('./middleware/validateImageRequest');
 const { jwtLogin, ldapLogin, passportLogin } = require('~/strategies');
@@ -33,6 +34,7 @@ const trusted_proxy = Number(TRUST_PROXY) || 1; /* trust first proxy by default 
 const app = express();
 
 const startServer = async () => {
+  console.log('[DEBUG] Entered startServer');
   if (typeof Bun !== 'undefined') {
     axios.defaults.headers.common['Accept-Encoding'] = 'gzip';
   }
@@ -58,7 +60,29 @@ const startServer = async () => {
   app.use(express.json({ limit: '3mb' }));
   app.use(express.urlencoded({ extended: true, limit: '3mb' }));
   app.use(mongoSanitize());
-  app.use(cors());
+  app.use((req, res, next) => {
+    console.log('[CORS DEBUG] Incoming request origin:', req.headers.origin);
+    next();
+  });
+  const allowedOrigins = [
+    ...Array.from({ length: 10 }, (_, i) => `http://localhost:300${i}`),
+    ...Array.from({ length: 10 }, (_, i) => `https://localhost:300${i}`),
+    'http://localhost:3080',
+    'https://localhost:3080',
+  ];
+  app.use(cors({
+    origin: function(origin, callback) {
+      console.log('[CORS DEBUG] Evaluating origin:', origin);
+      if (!origin || allowedOrigins.includes(origin)) {
+        console.log('[CORS DEBUG] Allowed origin:', origin);
+        callback(null, true);
+      } else {
+        console.log('[CORS DEBUG] Blocked origin:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  }));
   app.use(cookieParser());
 
   if (!isEnabled(DISABLE_COMPRESSION)) {
@@ -137,15 +161,28 @@ const startServer = async () => {
     res.send(updatedIndexHtml);
   });
 
-  app.listen(port, host, () => {
+  console.log('[DEBUG] About to read HTTPS cert files');
+  let httpsOptions;
+  try {
+    httpsOptions = {
+      key: fs.readFileSync(path.resolve(__dirname, '../../../key.pem')),
+      cert: fs.readFileSync(path.resolve(__dirname, '../../../cert.pem')),
+    };
+    console.log('[DEBUG] Successfully read HTTPS cert files');
+  } catch (err) {
+    console.error('[DEBUG] Error reading HTTPS cert files:', err);
+    throw err;
+  }
+  console.log('[DEBUG] About to start HTTPS server');
+  https.createServer(httpsOptions, app).listen(port, host, () => {
+    console.log('[DEBUG] HTTPS server started');
     if (host === '0.0.0.0') {
       logger.info(
-        `Server listening on all interfaces at port ${port}. Use http://localhost:${port} to access it`,
+        `Server listening on all interfaces at port ${port}. Use https://localhost:${port} to access it`,
       );
     } else {
-      logger.info(`Server listening at http://${host == '0.0.0.0' ? 'localhost' : host}:${port}`);
+      logger.info(`Server listening at https://${host == '0.0.0.0' ? 'localhost' : host}:${port}`);
     }
-
     initializeMCP(app);
   });
 };

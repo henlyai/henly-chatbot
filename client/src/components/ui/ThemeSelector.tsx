@@ -56,22 +56,25 @@ const ThemeSelector = ({ returnThemeOnly }: { returnThemeOnly?: boolean }) => {
 
   const changeTheme = useCallback(
     (value: string) => {
+      // Force light theme for ScaleWize AI - ignore user input
+      const forcedValue = 'light';
+      
       const now = Date.now();
       if (typeof window.lastThemeChange === 'number' && now - window.lastThemeChange < 500) {
         return;
       }
       window.lastThemeChange = now;
 
-      setTheme(value);
-      setAnnouncement(value === 'dark' ? 'Dark theme enabled' : 'Light theme enabled');
+      setTheme(forcedValue);
+      setAnnouncement('Light theme enabled');
     },
     [setTheme],
   );
 
   useEffect(() => {
-    if (theme === 'system') {
-      const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setTheme(prefersDarkScheme ? 'dark' : 'light');
+    // Force light theme on component mount
+    if (theme !== 'light') {
+      setTheme('light');
     }
   }, [theme, setTheme]);
 
@@ -83,13 +86,13 @@ const ThemeSelector = ({ returnThemeOnly }: { returnThemeOnly?: boolean }) => {
   }, [announcement]);
 
   if (returnThemeOnly === true) {
-    return <Theme theme={theme} onChange={changeTheme} />;
+    return <Theme theme="light" onChange={changeTheme} />;
   }
 
   return (
     <div className="flex flex-col items-center justify-center bg-white pt-6 dark:bg-gray-900 sm:pt-0">
       <div className="absolute bottom-0 left-0 m-4">
-        <Theme theme={theme} onChange={changeTheme} />
+        <Theme theme="light" onChange={changeTheme} />
       </div>
       {announcement && (
         <div aria-live="polite" className="sr-only">

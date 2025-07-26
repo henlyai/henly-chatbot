@@ -8,6 +8,8 @@ import { OpenIDIcon } from '~/components';
 import { getLoginError } from '~/utils';
 import { useLocalize } from '~/hooks';
 import LoginForm from './LoginForm';
+import Cookies from 'js-cookie';
+import axios from 'axios';
 
 function Login() {
   const localize = useLocalize();
@@ -44,6 +46,53 @@ function Login() {
       window.location.href = `${startupConfig.serverDomain}/oauth/openid`;
     }
   }, [shouldAutoRedirect, startupConfig]);
+
+  const [checkingSSO, setCheckingSSO] = useState(true);
+  const [hasSSOSession, setHasSSOSession] = useState(false);
+  const [ssoError, setSSOError] = useState<string | null>(null);
+
+  useEffect(() => {
+    console.log('[SSO DEBUG] useEffect running');
+    const ssoToken = Cookies.get('accessToken');
+    if (ssoToken) {
+      setHasSSOSession(true);
+      window.location.href = '/c/new';
+    } else {
+      setCheckingSSO(true);
+      axios.post('/api/auth/sso/librechat', {}, { withCredentials: true })
+        .then(() => {
+          window.location.href = '/c/new';
+        })
+        .catch((err) => {
+          setCheckingSSO(false);
+          setSSOError('SSO failed');
+          console.error('[SSO DEBUG] SSO failed', err);
+        });
+    }
+  }, []);
+
+  if (checkingSSO) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+        <p className="text-lg font-semibold">Checking SSO session...</p>
+      </div>
+    );
+  }
+  if (hasSSOSession) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+        <p className="text-lg font-semibold">Logging you in...</p>
+      </div>
+    );
+  }
+  if (ssoError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+        <p className="text-lg font-semibold text-red-500">{ssoError}</p>
+        {/* Optionally render the login form as fallback */}
+      </div>
+    );
+  }
 
   // Render fallback UI if auto-redirect is active.
   if (shouldAutoRedirect) {

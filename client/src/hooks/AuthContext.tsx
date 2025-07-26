@@ -141,8 +141,9 @@ const AuthContextProvider = ({
         const { user, token = '' } = data ?? {};
         if (token) {
           setUserContext({ token, isAuthenticated: true, user });
+          console.log('Silent refresh succeeded, user authenticated.');
         } else {
-          console.log('Token is not present. User is not authenticated.');
+          console.log('Silent refresh failed: Token is not present. User is not authenticated.');
           if (authConfig?.test === true) {
             return;
           }
