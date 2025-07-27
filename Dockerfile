@@ -30,6 +30,7 @@ COPY . .
 RUN npm run build:data-provider
 RUN npm run build:data-schemas
 RUN npm run build:api
+RUN npm run frontend
 
 # Remove dev dependencies to reduce image size
 RUN npm prune --production
