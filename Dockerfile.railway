@@ -1,0 +1,42 @@
+# Railway-optimized Dockerfile for LibreChat
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git
+
+# Copy package files
+COPY package*.json ./
+COPY client/package*.json ./client/
+COPY api/package*.json ./api/
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN npm run build:data-provider
+RUN npm run build:data-schemas
+RUN npm run build:api
+
+# Create a simple health check script
+RUN echo '#!/bin/sh\ncurl -f http://localhost:3080/api/health || exit 1' > /healthcheck.sh
+RUN chmod +x /healthcheck.sh
+
+# Expose port
+EXPOSE 3080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD /healthcheck.sh
+
+# Start the application
+CMD ["npm", "run", "backend"] 
