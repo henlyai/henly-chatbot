@@ -34,15 +34,8 @@ RUN npm run build:api
 # Remove dev dependencies to reduce image size
 RUN npm prune --production
 
-# Create a startup script that waits for dependencies
-RUN echo '#!/bin/sh\n\
-echo "Starting LibreChat..."\n\
-echo "Waiting for dependencies to be ready..."\n\
-sleep 10\n\
-echo "Starting backend..."\n\
-npm run backend\n\
-' > /start.sh
-
+# Copy startup script
+COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
 # Expose port
