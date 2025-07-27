@@ -16,9 +16,12 @@ RUN apk add --no-cache \
 COPY package*.json ./
 COPY client/package*.json ./client/
 COPY api/package*.json ./api/
+COPY packages/data-provider/package*.json ./packages/data-provider/
+COPY packages/data-schemas/package*.json ./packages/data-schemas/
+COPY packages/api/package*.json ./packages/api/
 
-# Install dependencies
-RUN npm ci --only=production
+# Install ALL dependencies (including dev dependencies for build)
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -27,6 +30,9 @@ COPY . .
 RUN npm run build:data-provider
 RUN npm run build:data-schemas
 RUN npm run build:api
+
+# Remove dev dependencies to reduce image size
+RUN npm prune --production
 
 # Create a startup script that waits for dependencies
 RUN echo '#!/bin/sh\n\
