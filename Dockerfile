@@ -1,50 +1,49 @@
-# v0.7.9-rc1
+# Railway-optimized Dockerfile for LibreChat
+FROM node:18-alpine
 
-# Base node image
-FROM node:20-alpine AS node
-
-# Install jemalloc
-RUN apk add --no-cache jemalloc
-RUN apk add --no-cache python3 py3-pip uv
-
-# Set environment variable to use jemalloc
-ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
-
-# Add `uv` for extended MCP support
-COPY --from=ghcr.io/astral-sh/uv:0.6.13 /uv /uvx /bin/
-RUN uv --version
-
-RUN mkdir -p /app && chown node:node /app
+# Set working directory
 WORKDIR /app
 
-USER node
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git \
+    curl
 
-COPY --chown=node:node . .
+# Copy package files first for better caching
+COPY package*.json ./
+COPY client/package*.json ./client/
+COPY api/package*.json ./api/
+COPY packages/data-provider/package*.json ./packages/data-provider/
+COPY packages/data-schemas/package*.json ./packages/data-schemas/
+COPY packages/api/package*.json ./packages/api/
 
-RUN \
-    # Allow mounting of these files, which have no default
-    touch .env ; \
-    # Create directories for the volumes to inherit the correct permissions
-    mkdir -p /app/client/public/images /app/api/logs ; \
-    npm config set fetch-retry-maxtimeout 600000 ; \
-    npm config set fetch-retries 5 ; \
-    npm config set fetch-retry-mintimeout 15000 ; \
-    npm install --no-audit; \
-    # React client build
-    NODE_OPTIONS="--max-old-space-size=2048" npm run frontend; \
-    npm prune --production; \
-    npm cache clean --force
+# Install ALL dependencies (including dev dependencies for build)
+RUN npm ci
 
-RUN mkdir -p /app/client/public/images /app/api/logs
+# Copy source code
+COPY . .
 
-# Node API setup
+# Build the application
+RUN npm run build:data-provider
+RUN npm run build:data-schemas
+RUN npm run build:api
+
+# Remove dev dependencies to reduce image size
+RUN npm prune --production
+
+# Copy startup script
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
+# Expose port
 EXPOSE 3080
-ENV HOST=0.0.0.0
-CMD ["npm", "run", "backend"]
 
-# Optional: for client with nginx routing
-# FROM nginx:stable-alpine AS nginx-client
-# WORKDIR /usr/share/nginx/html
-# COPY --from=node /app/client/dist /usr/share/nginx/html
-# COPY client/nginx.conf /etc/nginx/conf.d/default.conf
-# ENTRYPOINT ["nginx", "-g", "daemon off;"]
+# Health check with longer timeout and retries
+HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=5 \
+    CMD curl -f http://localhost:3080/api/health || exit 1
+
+# Start the application
+CMD ["/start.sh"] 
