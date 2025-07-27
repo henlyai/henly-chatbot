@@ -1,9 +1,9 @@
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = ".devcontainer/Dockerfile"
+dockerfilePath = "Dockerfile.railway"
 
 [deploy]
-startCommand = "npm install && npm run build:data-provider && npm run build:data-schemas && npm run build:api && npm run backend"
+startCommand = "/start.sh"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 600
 restartPolicyType = "ON_FAILURE"
