@@ -6,7 +6,7 @@ const port = process.env.PORT || 3080;
 console.log('Testing server on port:', port);
 
 const req = http.request({
-  hostname: 'localhost',
+  hostname: '0.0.0.0',
   port: port,
   path: '/health',
   method: 'GET',
