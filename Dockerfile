@@ -34,15 +34,6 @@ RUN echo "Creating librechat.yaml..." && \
     echo "  enabled: false" >> /app/librechat.yaml && \
     echo "  socialLogins: []" >> /app/librechat.yaml && \
     echo "  allowedDomains: []" >> /app/librechat.yaml && \
-    echo "features:" >> /app/librechat.yaml && \
-    echo "  codeInterpreter: true" >> /app/librechat.yaml && \
-    echo "  fileUpload: true" >> /app/librechat.yaml && \
-    echo "  imageGeneration: true" >> /app/librechat.yaml && \
-    echo "  voiceChat: false" >> /app/librechat.yaml && \
-    echo "  knowledgeBases: true" >> /app/librechat.yaml && \
-    echo "  mcpServers: true" >> /app/librechat.yaml && \
-    echo "  agents: true" >> /app/librechat.yaml && \
-    echo "  webSearch: true" >> /app/librechat.yaml && \
     echo "interface:" >> /app/librechat.yaml && \
     echo "  customWelcome: \"Welcome to LibreChat! Enjoy your experience.\"" >> /app/librechat.yaml
 
