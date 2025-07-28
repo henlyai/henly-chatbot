@@ -78,8 +78,20 @@ router.post('/2fa/disable', requireJwtAuth, disable2FA);
 router.post('/2fa/backup/regenerate', requireJwtAuth, regenerateBackupCodes);
 
 // Register SSO proxy endpoint for LibreChat
+router.options('/sso/librechat', (req, res) => {
+  console.log('[DEBUG] OPTIONS /api/auth/sso/librechat route hit');
+  res.header('Access-Control-Allow-Origin', 'https://scalewize-website.vercel.app');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.status(200).end();
+});
+
 router.post('/sso/librechat', (req, res, next) => {
   console.log('[DEBUG] POST /api/auth/sso/librechat route hit');
+  // Add CORS headers for the POST response
+  res.header('Access-Control-Allow-Origin', 'https://scalewize-website.vercel.app');
+  res.header('Access-Control-Allow-Credentials', 'true');
   next();
 }, ssoLibreChatController);
 
