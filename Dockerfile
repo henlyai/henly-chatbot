@@ -41,11 +41,11 @@ RUN echo "Creating librechat.yaml..." && \
     echo "  \"Google Drive\":" >> /app/librechat.yaml && \
     echo "    type: sse" >> /app/librechat.yaml && \
     echo "    url: https://mcp.pipedream.net/28971e50-c231-428a-97d9-803c981ade82/google_drive" >> /app/librechat.yaml && \
-    echo "    timeout: 60000" >> /app/librechat.yaml && \
+    echo "    timeout: 30000" >> /app/librechat.yaml && \
     echo "  \"Slack\":" >> /app/librechat.yaml && \
     echo "    type: sse" >> /app/librechat.yaml && \
     echo "    url: https://mcp.pipedream.net/28971e50-c231-428a-97d9-803c981ade82/slack" >> /app/librechat.yaml && \
-    echo "    timeout: 60000" >> /app/librechat.yaml
+    echo "    timeout: 30000" >> /app/librechat.yaml
 
 RUN echo "librechat.yaml created:" && ls -la /app/librechat.yaml && cat /app/librechat.yaml
 

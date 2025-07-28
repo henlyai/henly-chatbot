@@ -10,8 +10,8 @@ echo "Default port would be: 3080"
 echo "Debugging librechat.yaml..."
 ls -la /app/librechat.yaml || echo "librechat.yaml not found at runtime"
 cat /app/librechat.yaml | head -3 || echo "Failed to read librechat.yaml at runtime"
-echo "Starting backend with timeout..."
-timeout 60 npm run backend &
+echo "Starting backend..."
+npm run backend &
 BACKEND_PID=$!
 
 echo "Waiting 30 seconds for backend to start..."
@@ -26,4 +26,5 @@ ps aux | grep node
 echo "Testing health endpoint directly..."
 curl -f http://localhost:8080/health || echo "Health endpoint failed"
 
+echo "Backend started successfully. Keeping container alive..."
 wait $BACKEND_PID 
