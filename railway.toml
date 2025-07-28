@@ -16,6 +16,8 @@ CONFIG_PATH = "/app/librechat.yaml"
 JWT_ENABLED = "true"
 JWT_SECRET = "${JWT_SECRET}"
 JWT_REFRESH_SECRET = "${JWT_REFRESH_SECRET}"
+MCP_SERVERS_ENABLED = "true"
+MCP_SERVERS_CONFIG = "${MCP_SERVERS_CONFIG}"
 
 [deploy.healthcheck]
 port = 8080
