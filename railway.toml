@@ -11,6 +11,10 @@ numReplicas = 1
 
 [deploy.variables]
 HTTPS_ENABLED = "false"
+CONFIG_PATH = "/app/librechat.yaml"
+JWT_ENABLED = "true"
+JWT_SECRET = "${JWT_SECRET}"
+JWT_REFRESH_SECRET = "${JWT_REFRESH_SECRET}"
 
 [deploy.healthcheck]
 port = 8080

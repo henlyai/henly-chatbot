@@ -30,19 +30,21 @@ COPY . .
 RUN echo "Creating librechat.yaml..." && \
     echo "version: 1.2.1" > /app/librechat.yaml && \
     echo "cache: true" >> /app/librechat.yaml && \
-    echo "organizations:" >> /app/librechat.yaml && \
-    echo "  enabled: true" >> /app/librechat.yaml && \
-    echo "  defaultPlan: \"starter\"" >> /app/librechat.yaml && \
-    echo "jwt:" >> /app/librechat.yaml && \
-    echo "  enabled: true" >> /app/librechat.yaml && \
-    echo "  secret: \"\${JWT_SECRET}\"" >> /app/librechat.yaml && \
-    echo "  refreshSecret: \"\${JWT_REFRESH_SECRET}\"" >> /app/librechat.yaml && \
-    echo "  accessTokenExpiry: \"24h\"" >> /app/librechat.yaml && \
-    echo "  refreshTokenExpiry: \"7d\"" >> /app/librechat.yaml && \
     echo "registration:" >> /app/librechat.yaml && \
     echo "  enabled: false" >> /app/librechat.yaml && \
     echo "  socialLogins: []" >> /app/librechat.yaml && \
-    echo "  allowedDomains: []" >> /app/librechat.yaml
+    echo "  allowedDomains: []" >> /app/librechat.yaml && \
+    echo "features:" >> /app/librechat.yaml && \
+    echo "  codeInterpreter: true" >> /app/librechat.yaml && \
+    echo "  fileUpload: true" >> /app/librechat.yaml && \
+    echo "  imageGeneration: true" >> /app/librechat.yaml && \
+    echo "  voiceChat: false" >> /app/librechat.yaml && \
+    echo "  knowledgeBases: true" >> /app/librechat.yaml && \
+    echo "  mcpServers: true" >> /app/librechat.yaml && \
+    echo "  agents: true" >> /app/librechat.yaml && \
+    echo "  webSearch: true" >> /app/librechat.yaml && \
+    echo "interface:" >> /app/librechat.yaml && \
+    echo "  customWelcome: \"Welcome to LibreChat! Enjoy your experience.\"" >> /app/librechat.yaml
 
 RUN echo "librechat.yaml created:" && ls -la /app/librechat.yaml && cat /app/librechat.yaml
 
