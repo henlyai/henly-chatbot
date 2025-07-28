@@ -26,6 +26,10 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Debug: Check if librechat.yaml exists
+RUN ls -la | grep yaml || echo "No yaml files found"
+RUN ls -la librechat.yaml || echo "librechat.yaml not found in root"
+
 # Build the application
 RUN npm run build:data-provider
 RUN npm run build:data-schemas
