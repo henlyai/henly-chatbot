@@ -13,6 +13,9 @@ numReplicas = 1
 HTTPS_ENABLED = "false"
 
 [deploy.healthcheck]
+port = 8080
+
+[deploy.healthcheck]
 path = "/api/health"
 timeout = 600
 interval = 30

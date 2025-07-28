@@ -30,6 +30,10 @@ COPY . .
 RUN ls -la | grep yaml || echo "No yaml files found"
 RUN ls -la librechat.yaml || echo "librechat.yaml not found in root"
 
+# Ensure librechat.yaml is in the correct location
+RUN cp librechat.yaml /app/librechat.yaml || echo "Failed to copy librechat.yaml"
+RUN ls -la /app/librechat.yaml || echo "librechat.yaml not found in /app"
+
 # Build the application
 RUN npm run build:data-provider
 RUN npm run build:data-schemas
@@ -43,12 +47,12 @@ RUN npm prune --production
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
-# Expose port
-EXPOSE 3080
+# Expose port (Railway will set PORT env var)
+EXPOSE 8080
 
 # Health check with longer timeout and retries
 HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=5 \
-    CMD curl -f http://localhost:3080/api/health || exit 1
+    CMD curl -f http://localhost:8080/api/health || exit 1
 
 # Start the application
 CMD ["/start.sh"] 
