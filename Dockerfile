@@ -26,18 +26,25 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Debug: Check what files were copied
-RUN echo "=== Files in /app ==="
-RUN ls -la | head -20
-RUN echo "=== Looking for yaml files ==="
-RUN ls -la | grep yaml || echo "No yaml files found"
-RUN ls -la librechat.yaml || echo "librechat.yaml not found in root"
+# Create librechat.yaml directly in the Dockerfile
+RUN echo "Creating librechat.yaml..." && \
+    echo "version: 1.2.1" > /app/librechat.yaml && \
+    echo "cache: true" >> /app/librechat.yaml && \
+    echo "organizations:" >> /app/librechat.yaml && \
+    echo "  enabled: true" >> /app/librechat.yaml && \
+    echo "  defaultPlan: \"starter\"" >> /app/librechat.yaml && \
+    echo "jwt:" >> /app/librechat.yaml && \
+    echo "  enabled: true" >> /app/librechat.yaml && \
+    echo "  secret: \"\${JWT_SECRET}\"" >> /app/librechat.yaml && \
+    echo "  refreshSecret: \"\${JWT_REFRESH_SECRET}\"" >> /app/librechat.yaml && \
+    echo "  accessTokenExpiry: \"24h\"" >> /app/librechat.yaml && \
+    echo "  refreshTokenExpiry: \"7d\"" >> /app/librechat.yaml && \
+    echo "registration:" >> /app/librechat.yaml && \
+    echo "  enabled: false" >> /app/librechat.yaml && \
+    echo "  socialLogins: []" >> /app/librechat.yaml && \
+    echo "  allowedDomains: []" >> /app/librechat.yaml
 
-# Ensure librechat.yaml is in the correct location
-RUN cp librechat.yaml /app/librechat.yaml || echo "Failed to copy librechat.yaml"
-RUN ls -la /app/librechat.yaml || echo "librechat.yaml not found in /app"
-RUN chmod 644 /app/librechat.yaml || echo "Failed to set permissions"
-RUN cat /app/librechat.yaml | head -5 || echo "Failed to read librechat.yaml"
+RUN echo "librechat.yaml created:" && ls -la /app/librechat.yaml && cat /app/librechat.yaml
 
 # Build the application
 RUN npm run build:data-provider
