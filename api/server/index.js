@@ -161,30 +161,48 @@ const startServer = async () => {
     res.send(updatedIndexHtml);
   });
 
-  console.log('[DEBUG] About to read HTTPS cert files');
-  let httpsOptions;
-  try {
-    httpsOptions = {
-      key: fs.readFileSync(path.resolve(__dirname, '../../../key.pem')),
-      cert: fs.readFileSync(path.resolve(__dirname, '../../../cert.pem')),
-    };
-    console.log('[DEBUG] Successfully read HTTPS cert files');
-  } catch (err) {
-    console.error('[DEBUG] Error reading HTTPS cert files:', err);
-    throw err;
-  }
-  console.log('[DEBUG] About to start HTTPS server');
-  https.createServer(httpsOptions, app).listen(port, host, () => {
-    console.log('[DEBUG] HTTPS server started');
-    if (host === '0.0.0.0') {
-      logger.info(
-        `Server listening on all interfaces at port ${port}. Use https://localhost:${port} to access it`,
-      );
-    } else {
-      logger.info(`Server listening at https://${host == '0.0.0.0' ? 'localhost' : host}:${port}`);
+  // Check if HTTPS is enabled
+  const httpsEnabled = process.env.HTTPS_ENABLED !== 'false';
+  
+  if (httpsEnabled) {
+    console.log('[DEBUG] About to read HTTPS cert files');
+    let httpsOptions;
+    try {
+      httpsOptions = {
+        key: fs.readFileSync(path.resolve(__dirname, '../../../key.pem')),
+        cert: fs.readFileSync(path.resolve(__dirname, '../../../cert.pem')),
+      };
+      console.log('[DEBUG] Successfully read HTTPS cert files');
+    } catch (err) {
+      console.error('[DEBUG] Error reading HTTPS cert files:', err);
+      throw err;
     }
-    initializeMCP(app);
-  });
+    console.log('[DEBUG] About to start HTTPS server');
+    https.createServer(httpsOptions, app).listen(port, host, () => {
+      console.log('[DEBUG] HTTPS server started');
+      if (host === '0.0.0.0') {
+        logger.info(
+          `Server listening on all interfaces at port ${port}. Use https://localhost:${port} to access it`,
+        );
+      } else {
+        logger.info(`Server listening at https://${host == '0.0.0.0' ? 'localhost' : host}:${port}`);
+      }
+      initializeMCP(app);
+    });
+  } else {
+    console.log('[DEBUG] Starting HTTP server (HTTPS disabled)');
+    app.listen(port, host, () => {
+      console.log('[DEBUG] HTTP server started');
+      if (host === '0.0.0.0') {
+        logger.info(
+          `Server listening on all interfaces at port ${port}. Use http://localhost:${port} to access it`,
+        );
+      } else {
+        logger.info(`Server listening at http://${host == '0.0.0.0' ? 'localhost' : host}:${port}`);
+      }
+      initializeMCP(app);
+    });
+  }
 };
 
 startServer();
