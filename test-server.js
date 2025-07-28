@@ -8,7 +8,7 @@ console.log('Testing server on port:', port);
 const req = http.request({
   hostname: 'localhost',
   port: port,
-  path: '/api/health',
+  path: '/health',
   method: 'GET',
   timeout: 5000
 }, (res) => {
