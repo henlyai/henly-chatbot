@@ -33,6 +33,8 @@ RUN ls -la librechat.yaml || echo "librechat.yaml not found in root"
 # Ensure librechat.yaml is in the correct location
 RUN cp librechat.yaml /app/librechat.yaml || echo "Failed to copy librechat.yaml"
 RUN ls -la /app/librechat.yaml || echo "librechat.yaml not found in /app"
+RUN chmod 644 /app/librechat.yaml || echo "Failed to set permissions"
+RUN cat /app/librechat.yaml | head -5 || echo "Failed to read librechat.yaml"
 
 # Build the application
 RUN npm run build:data-provider

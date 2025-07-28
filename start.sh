@@ -7,6 +7,9 @@ node debug-env.js
 echo "Debugging port configuration..."
 echo "PORT env var: $PORT"
 echo "Default port would be: 3080"
+echo "Debugging librechat.yaml..."
+ls -la /app/librechat.yaml || echo "librechat.yaml not found at runtime"
+cat /app/librechat.yaml | head -3 || echo "Failed to read librechat.yaml at runtime"
 echo "Starting backend with timeout..."
 timeout 60 npm run backend &
 BACKEND_PID=$!
