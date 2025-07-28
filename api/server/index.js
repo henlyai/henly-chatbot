@@ -31,6 +31,11 @@ const port = isNaN(Number(PORT)) ? 3080 : Number(PORT);
 const host = HOST || 'localhost';
 const trusted_proxy = Number(TRUST_PROXY) || 1; /* trust first proxy by default */
 
+// Debug host configuration
+console.log('[DEBUG] HOST env var:', HOST);
+console.log('[DEBUG] Host value:', host);
+console.log('[DEBUG] Port value:', port);
+
 const app = express();
 
 const startServer = async () => {
@@ -193,6 +198,7 @@ const startServer = async () => {
     });
   } else {
     console.log('[DEBUG] Starting HTTP server (HTTPS disabled)');
+    console.log('[DEBUG] About to listen on host:', host, 'port:', port);
     app.listen(port, host, () => {
       console.log('[DEBUG] HTTP server started');
       if (host === '0.0.0.0') {
