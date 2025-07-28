@@ -28,7 +28,7 @@ COPY . .
 
 # Create librechat.yaml directly in the Dockerfile
 RUN echo "Creating librechat.yaml..." && \
-    echo "version: 1.2.1" > /app/librechat.yaml && \
+    echo "version: 1.2.8" > /app/librechat.yaml && \
     echo "cache: true" >> /app/librechat.yaml && \
     echo "registration:" >> /app/librechat.yaml && \
     echo "  enabled: false" >> /app/librechat.yaml && \

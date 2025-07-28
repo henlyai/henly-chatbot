@@ -23,4 +23,8 @@ node test-server.js
 echo "Backend process status:"
 ps aux | grep node
 
+echo "Testing health endpoint directly..."
+curl -f http://localhost:8080/api/health || echo "Health endpoint failed"
+curl -f http://localhost:8080/health || echo "Alternative health endpoint failed"
+
 wait $BACKEND_PID 
