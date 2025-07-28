@@ -10,6 +10,7 @@ numReplicas = 1
 
 [deploy.variables]
 HTTPS_ENABLED = "false"
+HOST = "0.0.0.0"
 CONFIG_PATH = "/app/librechat.yaml"
 JWT_ENABLED = "true"
 JWT_SECRET = "${JWT_SECRET}"
