@@ -80,15 +80,13 @@ const startServer = async () => {
   app.use(cors({
     origin: function(origin, callback) {
       console.log('[CORS DEBUG] Evaluating origin:', origin);
-      if (!origin || allowedOrigins.includes(origin)) {
-        console.log('[CORS DEBUG] Allowed origin:', origin);
-        callback(null, true);
-      } else {
-        console.log('[CORS DEBUG] Blocked origin:', origin);
-        callback(new Error('Not allowed by CORS'));
-      }
+      // Allow all origins for now to debug the issue
+      console.log('[CORS DEBUG] Allowing origin:', origin);
+      callback(null, true);
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   }));
   app.use(cookieParser());
 
