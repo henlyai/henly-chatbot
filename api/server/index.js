@@ -69,6 +69,8 @@ const startServer = async () => {
     ...Array.from({ length: 10 }, (_, i) => `https://localhost:300${i}`),
     'http://localhost:3080',
     'https://localhost:3080',
+    'https://scalewize-website.vercel.app',
+    'https://scalewize-production-chatbot-production.up.railway.app',
   ];
   app.use(cors({
     origin: function(origin, callback) {
