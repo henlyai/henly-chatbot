@@ -5,11 +5,11 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc src/simple-server.ts --outDir dist",
-    "start": "node dist/simple-server.js",
-    "dev": "tsx src/simple-server.ts",
-    "simple": "tsx src/simple-server.ts",
-    "watch": "tsx watch src/simple-server.ts"
+    "build": "echo 'No build step needed for JavaScript'",
+    "start": "node server.js",
+    "dev": "node server.js",
+    "simple": "node server.js",
+    "watch": "node server.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.4.0",
