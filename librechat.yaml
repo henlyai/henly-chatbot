@@ -46,7 +46,7 @@ features:
 
 # Custom interface configuration
 interface:
-  customWelcome: "Welcome to LibreChat! Enjoy your experience."
+  customWelcome: "Welcome {{user.name}}! How Can I Help?"
   # MCP Servers UI configuration
   mcpServers:
     placeholder: 'MCP Servers'

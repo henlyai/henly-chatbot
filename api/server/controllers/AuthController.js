@@ -11,7 +11,7 @@ const {
   registerUser,
 } = require('~/server/services/AuthService');
 const AuthService = require('../../server/services/AuthService');
-const { findUser, createUser, getUserById, deleteAllUserSessions, findSession } = require('~/models');
+const { findUser, createUser, getUserById, deleteAllUserSessions, findSession, updateUser } = require('~/models');
 const { getOpenIdConfig } = require('~/strategies');
 
 const registrationController = async (req, res) => {
@@ -172,11 +172,18 @@ const ssoLibreChatController = async (req, res) => {
         libreUser = await createUser({
           provider: 'sso',
           email: userEmail,
-          name: decodedToken.user_metadata?.full_name || userEmail,
+          name: decodedToken.user_metadata?.full_name || userEmail.split('@')[0],
           emailVerified: decodedToken.email_verified || false,
           role: 'user',
         }, balanceConfig, true, true);
         console.log('[SSO DEBUG] Created new LibreChat user:', libreUser);
+      } else {
+        // Update existing user's name if it's different
+        const userName = decodedToken.user_metadata?.full_name || userEmail.split('@')[0];
+        if (libreUser.name !== userName) {
+          libreUser = await updateUser(libreUser._id, { name: userName });
+          console.log('[SSO DEBUG] Updated LibreChat user name:', libreUser);
+        }
       }
     } catch (err) {
       console.error('[SSO DEBUG] Error finding/creating LibreChat user:', err);
