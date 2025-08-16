@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # Google Drive MCP Server
+  google-drive-mcp:
+    build:
+      context: ./custom-mcp-servers/google-drive-mcp
+      dockerfile: Dockerfile
+    container_name: scalewize-google-drive-mcp
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - MCP_TRANSPORT=sse
+    env_file:
+      - ./custom-mcp-servers/google-drive-mcp/.env
+    restart: unless-stopped
+    networks:
+      - scalewize-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Slack MCP Server (if you want to host your own)
+  slack-mcp:
+    image: node:18-alpine
+    container_name: scalewize-slack-mcp
+    working_dir: /app
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - MCP_TRANSPORT=sse
+    restart: unless-stopped
+    networks:
+      - scalewize-network
+    # You can add your own Slack MCP server here
+
+networks:
+  scalewize-network:
+    driver: bridge 

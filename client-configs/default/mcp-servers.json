@@ -1,0 +1,22 @@
+{
+  "client_id": "default",
+  "client_name": "Default Client",
+  "mcp_servers": [
+    {
+      "name": "Google Drive",
+      "type": "shared",
+      "url": "https://shared-google-drive-mcp.railway.app/sse",
+      "enabled": true,
+      "oauth_required": true,
+      "description": "Access Google Drive files and folders"
+    },
+    {
+      "name": "Slack",
+      "type": "shared",
+      "url": "https://shared-slack-mcp.railway.app/sse",
+      "enabled": true,
+      "oauth_required": true,
+      "description": "Send messages and read channels in Slack"
+    }
+  ]
+} 
