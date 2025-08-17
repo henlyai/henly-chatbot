@@ -10,6 +10,9 @@ echo "Default port would be: 3080"
 echo "Debugging librechat.yaml..."
 ls -la /app/librechat.yaml || echo "librechat.yaml not found at runtime"
 cat /app/librechat.yaml | head -3 || echo "Failed to read librechat.yaml at runtime"
+
+echo "Testing configuration loading..."
+node test-config.js
 echo "Starting backend..."
 npm run backend &
 BACKEND_PID=$!
