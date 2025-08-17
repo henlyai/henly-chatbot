@@ -224,6 +224,29 @@ class SimpleGoogleDriveServer {
       res.redirect(authUrl);
     });
 
+    // SSE endpoint for MCP communication
+    app.get('/sse', (req, res) => {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+      });
+
+      // Send initial connection message
+      res.write('data: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{},"resources":{}},"serverInfo":{"name":"Google Drive MCP Server","version":"1.0.0"}}}\n\n');
+
+      // Keep connection alive
+      const interval = setInterval(() => {
+        res.write(':\n\n'); // Keep-alive comment
+      }, 30000);
+
+      req.on('close', () => {
+        clearInterval(interval);
+      });
+    });
+
     const port = process.env.PORT || 3001;
     app.listen(port, () => {
       console.log(`🚀 Simple Google Drive Server running on port ${port}`);
