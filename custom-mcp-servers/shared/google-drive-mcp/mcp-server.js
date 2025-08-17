@@ -1,63 +1,112 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 
 dotenv.config();
 
-async function start() {
-  const app = express();
-  app.use(cors());
-  app.use(express.json());
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-  // Health
-  app.get('/health', (_req, res) => res.json({ status: 'ok', server: 'google-drive-mcp', ts: new Date().toISOString() }));
+// Health check endpoint
+app.get('/health', (_req, res) => res.json({ 
+  status: 'ok', 
+  server: 'google-drive-mcp', 
+  ts: new Date().toISOString() 
+}));
 
-  // Create MCP server
-  const mcp = new Server({ name: 'Google Drive MCP', version: '1.0.0' });
+// Simple SSE endpoint for MCP communication
+app.get('/sse', (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
+  });
 
-  // Minimal tools so UI appears; real Drive tools can be added after
-  mcp.setRequestHandler('tools/list', async () => ({
-    tools: [
-      {
-        name: 'ping',
-        description: 'Returns a pong response for health checks',
-        inputSchema: { type: 'object', properties: {} },
-      },
-      {
-        name: 'info',
-        description: 'Describes available Google Drive capabilities',
-        inputSchema: { type: 'object', properties: {} },
+  // Send initial connection message with tools
+  const tools = {
+    "list_files": {
+      "name": "list_files",
+      "description": "List files and folders in Google Drive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "folderId": {
+            "type": "string",
+            "description": "Folder ID to list (default: root)"
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "Maximum number of results (default: 50)"
+          }
+        }
       }
-    ]
-  }));
-
-  mcp.setRequestHandler('tools/call', async (request) => {
-    const { name, arguments: args } = request.params;
-    
-    switch (name) {
-      case 'ping':
-        return { content: [{ type: 'text', text: 'pong' }] };
-      case 'info':
-        return { content: [{ type: 'text', text: 'Available: list_files, search_files, get_file_content, get_file_metadata (requires OAuth).' }] };
-      default:
-        throw new Error(`Unknown tool: ${name}`);
+    },
+    "search_files": {
+      "name": "search_files",
+      "description": "Search for files in Google Drive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query"
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "Maximum number of results (default: 50)"
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    "get_file_content": {
+      "name": "get_file_content",
+      "description": "Get the content of a file from Google Drive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "File ID to get content from"
+          }
+        },
+        "required": ["fileId"]
+      }
+    },
+    "get_file_metadata": {
+      "name": "get_file_metadata",
+      "description": "Get metadata for a file from Google Drive",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "description": "File ID to get metadata for"
+          }
+        },
+        "required": ["fileId"]
+      }
     }
+  };
+
+  res.write(`data: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":${JSON.stringify(tools)},"resources":{}},"serverInfo":{"name":"Google Drive MCP Server","version":"1.0.0"}}}\n\n`);
+
+  // Keep connection alive
+  const interval = setInterval(() => {
+    res.write(':\n\n'); // Keep-alive comment
+  }, 30000);
+
+  req.on('close', () => {
+    clearInterval(interval);
   });
+});
 
-  // Wire SSE transport at /sse
-  const transport = new SSEServerTransport('/sse', app);
-  await mcp.connect(transport);
-
-  const port = process.env.PORT || 3001;
-  app.listen(port, () => {
-    console.log(`MCP (SDK) server listening on ${port}`);
-    console.log(`SSE endpoint: http://localhost:${port}/sse`);
-  });
-}
-
-start().catch((e) => {
-  console.error('Failed to start MCP server:', e);
-  process.exit(1);
+const port = process.env.PORT || 3001;
+app.listen(port, () => {
+  console.log(`🚀 Google Drive MCP Server running on port ${port}`);
+  console.log(`📊 Health check: http://localhost:${port}/health`);
+  console.log(`📡 SSE endpoint: http://localhost:${port}/sse`);
 }); 
