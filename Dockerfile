@@ -26,28 +26,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Create librechat.yaml directly in the Dockerfile
-RUN echo "Creating librechat.yaml..." && \
-    echo "version: 1.2.8" > /app/librechat.yaml && \
-    echo "cache: true" >> /app/librechat.yaml && \
-    echo "registration:" >> /app/librechat.yaml && \
-    echo "  enabled: false" >> /app/librechat.yaml && \
-    echo "  socialLogins: []" >> /app/librechat.yaml && \
-    echo "  allowedDomains: []" >> /app/librechat.yaml && \
-    echo "interface:" >> /app/librechat.yaml && \
-    echo "  customWelcome: \"Welcome to LibreChat! Enjoy your experience.\"" >> /app/librechat.yaml && \
-    echo "# MCP Servers Configuration" >> /app/librechat.yaml && \
-    echo "mcpServers:" >> /app/librechat.yaml && \
-    echo "  \"Google Drive\":" >> /app/librechat.yaml && \
-    echo "    type: sse" >> /app/librechat.yaml && \
-    echo "    url: https://mcp.pipedream.net/28971e50-c231-428a-97d9-803c981ade82/google_drive" >> /app/librechat.yaml && \
-    echo "    timeout: 30000" >> /app/librechat.yaml && \
-    echo "  \"Slack\":" >> /app/librechat.yaml && \
-    echo "    type: sse" >> /app/librechat.yaml && \
-    echo "    url: https://mcp.pipedream.net/28971e50-c231-428a-97d9-803c981ade82/slack" >> /app/librechat.yaml && \
-    echo "    timeout: 30000" >> /app/librechat.yaml
-
-RUN echo "librechat.yaml created:" && ls -la /app/librechat.yaml && cat /app/librechat.yaml
+# Use the librechat.yaml from the repository (not hardcoded)
+RUN echo "Using librechat.yaml from repository:" && ls -la /app/librechat.yaml && cat /app/librechat.yaml
 
 # Build the application
 RUN npm run build:data-provider

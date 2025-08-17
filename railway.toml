@@ -16,7 +16,7 @@ CONFIG_PATH = "/app/librechat.yaml"
 JWT_ENABLED = "true"
 JWT_SECRET = "${JWT_SECRET}"
 JWT_REFRESH_SECRET = "${JWT_REFRESH_SECRET}"
-MCP_SERVERS_ENABLED = "false"
+MCP_SERVERS_ENABLED = "true"
 NODE_OPTIONS = "--max-old-space-size=512"
 
 [deploy.healthcheck]
