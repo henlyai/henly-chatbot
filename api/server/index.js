@@ -180,7 +180,20 @@ const startServer = async () => {
       console.log('[DEBUG] Successfully read HTTPS cert files');
     } catch (err) {
       console.error('[DEBUG] Error reading HTTPS cert files:', err);
-      throw err;
+      console.log('[DEBUG] Falling back to HTTP mode due to missing SSL certificates');
+      // Fall back to HTTP mode if SSL certificates are missing
+      app.listen(port, host, () => {
+        console.log('[DEBUG] HTTP server started (fallback from HTTPS)');
+        if (host === '0.0.0.0') {
+          logger.info(
+            `Server listening on all interfaces at port ${port}. Use http://localhost:${port} to access it`,
+          );
+        } else {
+          logger.info(`Server listening at http://${host == '0.0.0.0' ? 'localhost' : host}:${port}`);
+        }
+        initializeMCP(app);
+      });
+      return;
     }
     console.log('[DEBUG] About to start HTTPS server');
     https.createServer(httpsOptions, app).listen(port, host, () => {
