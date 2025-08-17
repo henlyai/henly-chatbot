@@ -234,8 +234,74 @@ class SimpleGoogleDriveServer {
         'Access-Control-Allow-Headers': 'Cache-Control'
       });
 
-      // Send initial connection message
-      res.write('data: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{},"resources":{}},"serverInfo":{"name":"Google Drive MCP Server","version":"1.0.0"}}}\n\n');
+      // Send initial connection message with tools
+      const tools = {
+        "list_files": {
+          "name": "list_files",
+          "description": "List files and folders in Google Drive",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "folderId": {
+                "type": "string",
+                "description": "Folder ID to list (default: root)"
+              },
+              "maxResults": {
+                "type": "number",
+                "description": "Maximum number of results (default: 50)"
+              }
+            }
+          }
+        },
+        "search_files": {
+          "name": "search_files",
+          "description": "Search for files in Google Drive",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "Search query"
+              },
+              "maxResults": {
+                "type": "number",
+                "description": "Maximum number of results (default: 50)"
+              }
+            },
+            "required": ["query"]
+          }
+        },
+        "get_file_content": {
+          "name": "get_file_content",
+          "description": "Get the content of a file from Google Drive",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "description": "File ID to get content from"
+              }
+            },
+            "required": ["fileId"]
+          }
+        },
+        "get_file_metadata": {
+          "name": "get_file_metadata",
+          "description": "Get metadata for a file from Google Drive",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "fileId": {
+                "type": "string",
+                "description": "File ID to get metadata for"
+              }
+            },
+            "required": ["fileId"]
+          }
+        }
+      };
+
+      res.write(`data: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":${JSON.stringify(tools)},"resources":{}},"serverInfo":{"name":"Google Drive MCP Server","version":"1.0.0"}}}\n\n`);
 
       // Keep connection alive
       const interval = setInterval(() => {
