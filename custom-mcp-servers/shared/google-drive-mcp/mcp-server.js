@@ -18,23 +18,33 @@ async function start() {
   const mcp = new Server({ name: 'Google Drive MCP', version: '1.0.0' });
 
   // Minimal tools so UI appears; real Drive tools can be added after
-  mcp.tool(
-    'ping',
-    {
-      description: 'Returns a pong response for health checks',
-      inputSchema: { type: 'object', properties: {} },
-    },
-    async () => ({ content: [{ type: 'text', text: 'pong' }] })
-  );
+  mcp.setRequestHandler('tools/list', async () => ({
+    tools: [
+      {
+        name: 'ping',
+        description: 'Returns a pong response for health checks',
+        inputSchema: { type: 'object', properties: {} },
+      },
+      {
+        name: 'info',
+        description: 'Describes available Google Drive capabilities',
+        inputSchema: { type: 'object', properties: {} },
+      }
+    ]
+  }));
 
-  mcp.tool(
-    'info',
-    {
-      description: 'Describes available Google Drive capabilities',
-      inputSchema: { type: 'object', properties: {} },
-    },
-    async () => ({ content: [{ type: 'text', text: 'Available: list_files, search_files, get_file_content, get_file_metadata (requires OAuth)."' }] })
-  );
+  mcp.setRequestHandler('tools/call', async (request) => {
+    const { name, arguments: args } = request.params;
+    
+    switch (name) {
+      case 'ping':
+        return { content: [{ type: 'text', text: 'pong' }] };
+      case 'info':
+        return { content: [{ type: 'text', text: 'Available: list_files, search_files, get_file_content, get_file_metadata (requires OAuth).' }] };
+      default:
+        throw new Error(`Unknown tool: ${name}`);
+    }
+  });
 
   // Wire SSE transport at /sse
   const transport = new SSEServerTransport('/sse', app);
