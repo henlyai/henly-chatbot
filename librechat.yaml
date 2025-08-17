@@ -8,41 +8,14 @@ version: 1.2.1
 cache: true
 
 # =============================================================================
-# SCALEWIZE AI MULTI-TENANT CONFIGURATION
+# SCALEWIZE AI CONFIGURATION
 # =============================================================================
-
-# Enable multi-tenant features
-organizations:
-  enabled: true
-  defaultPlan: "starter"
-
-# Enable JWT authentication for ScaleWize AI integration
-jwt:
-  enabled: true
-  secret: "${JWT_SECRET}"
-  refreshSecret: "${JWT_REFRESH_SECRET}"
-  accessTokenExpiry: "24h"
-  refreshTokenExpiry: "7d"
 
 # Disable default registration (auth handled by ScaleWize AI)
 registration:
   enabled: false
   socialLogins: []
   allowedDomains: []
-
-# Enable advanced features
-features:
-  codeInterpreter: true
-  fileUpload: true
-  imageGeneration: true
-  voiceChat: false
-  knowledgeBases: true
-  mcpServers: true
-  agents: true
-  webSearch: true
-
-# File strategy s3/firebase
-# fileStrategy: "s3"
 
 # Custom interface configuration
 interface:
