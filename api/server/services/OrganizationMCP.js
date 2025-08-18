@@ -49,7 +49,7 @@ class OrganizationMCPService {
           capabilities: server.capabilities || []
         };
 
-        // Add OAuth configuration if needed
+        // Add OAuth configuration for Google Drive (used during user-specific tool calls, not app-level initialization)
         if (server.name === 'Google Drive') {
           librechatConfig[server.name].oauth = {
             authorization_url: 'https://accounts.google.com/o/oauth2/auth',
@@ -59,7 +59,7 @@ class OrganizationMCPService {
             client_secret: process.env.GOOGLE_CLIENT_SECRET,
             redirect_uri: `${server.endpoint}/oauth/callback`
           };
-          logger.info(`[OrganizationMCP] Added OAuth config for Google Drive MCP`);
+          logger.info(`[OrganizationMCP] Added OAuth config for Google Drive MCP (for user-specific connections)`);
         }
       }
 
