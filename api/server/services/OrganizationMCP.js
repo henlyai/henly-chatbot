@@ -16,6 +16,8 @@ class OrganizationMCPService {
    */
   async getOrganizationMCPServers(organizationId) {
     try {
+      logger.info(`[OrganizationMCP] Fetching MCP servers for organization: ${organizationId}`);
+      
       const { data: mcpServers, error } = await this.supabase
         .from('mcp_servers')
         .select('id, name, description, endpoint, capabilities, is_active, organization_id')
@@ -27,10 +29,18 @@ class OrganizationMCPService {
         return {};
       }
 
+      logger.info(`[OrganizationMCP] Found ${mcpServers?.length || 0} MCP servers in database`);
+      
+      if (mcpServers && mcpServers.length > 0) {
+        mcpServers.forEach(server => {
+          logger.info(`[OrganizationMCP] Server: ${server.name}, Endpoint: ${server.endpoint}, Active: ${server.is_active}`);
+        });
+      }
+
       // Convert to LibreChat format
       const librechatConfig = {};
       
-      for (const server of mcpServers) {
+      for (const server of mcpServers || []) {
         librechatConfig[server.name] = {
           type: 'sse',
           url: server.endpoint,
@@ -49,10 +59,12 @@ class OrganizationMCPService {
             client_secret: process.env.GOOGLE_CLIENT_SECRET,
             redirect_uri: `${server.endpoint}/oauth/callback`
           };
+          logger.info(`[OrganizationMCP] Added OAuth config for Google Drive MCP`);
         }
       }
 
       logger.info(`[OrganizationMCP] Loaded ${Object.keys(librechatConfig).length} MCP servers for organization ${organizationId}`);
+      logger.info(`[OrganizationMCP] Final config keys: ${Object.keys(librechatConfig).join(', ')}`);
       return librechatConfig;
 
     } catch (error) {

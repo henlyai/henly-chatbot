@@ -12,15 +12,19 @@ const { getLogStores } = require('~/cache');
 async function initializeMCP(app) {
   const mcpServers = app.locals.mcpConfig;
   if (!mcpServers) {
+    logger.info('[MCP] No MCP configuration found in app.locals.mcpConfig');
     return;
   }
 
-  logger.info('Initializing MCP servers...');
+  logger.info(`[MCP] Initializing MCP servers... Found ${Object.keys(mcpServers).length} server(s)`);
+  logger.info(`[MCP] Server names: ${Object.keys(mcpServers).join(', ')}`);
+  
   const mcpManager = getMCPManager();
   const flowsCache = getLogStores(CacheKeys.FLOWS);
   const flowManager = flowsCache ? getFlowStateManager(flowsCache) : null;
 
   try {
+    logger.info('[MCP] Starting MCP manager initialization...');
     await mcpManager.initializeMCP({
       mcpServers,
       flowManager,
@@ -32,21 +36,28 @@ async function initializeMCP(app) {
       },
     });
 
+    logger.info('[MCP] MCP manager initialization completed');
     delete app.locals.mcpConfig;
     const availableTools = await getCachedTools();
 
     if (!availableTools) {
-      logger.warn('No available tools found in cache during MCP initialization');
+      logger.warn('[MCP] No available tools found in cache during MCP initialization');
       return;
     }
 
+    logger.info(`[MCP] Found ${Object.keys(availableTools).length} available tools in cache`);
     const toolsCopy = { ...availableTools };
     await mcpManager.mapAvailableTools(toolsCopy, flowManager);
     await setCachedTools(toolsCopy, { isGlobal: true });
 
-    logger.info('MCP servers initialized successfully');
+    logger.info('[MCP] MCP servers initialized successfully');
   } catch (error) {
-    logger.error('Failed to initialize MCP servers:', error);
+    logger.error('[MCP] Failed to initialize MCP servers:', error);
+    logger.error('[MCP] Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
   }
 }
 
