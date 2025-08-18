@@ -130,19 +130,8 @@ actions:
     - "librechat.ai"
     - "google.com"
 
-# MCP Servers Configuration
-mcpServers:
-  "Google Drive":
-    type: sse
-    url: https://mcp-servers-production-c189.up.railway.app/sse
-    timeout: 60000
-    oauth:
-      authorization_url: https://accounts.google.com/o/oauth2/auth
-      token_url: https://oauth2.googleapis.com/token
-      scope: https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file
-      client_id: ""
-      client_secret: ""
-      redirect_uri: https://mcp-servers-production-c189.up.railway.app/oauth/callback
+# MCP Servers Configuration - Now managed via Supabase
+# mcpServers configuration has been moved to Supabase database
 
 # Definition of custom endpoints
 endpoints:

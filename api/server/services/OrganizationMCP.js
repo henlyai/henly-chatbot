@@ -18,7 +18,7 @@ class OrganizationMCPService {
     try {
       const { data: mcpServers, error } = await this.supabase
         .from('mcp_servers')
-        .select('*')
+        .select('id, name, description, endpoint, capabilities, is_active, organization_id')
         .eq('organization_id', organizationId)
         .eq('is_active', true);
 

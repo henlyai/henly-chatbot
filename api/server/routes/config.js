@@ -3,6 +3,7 @@ const { logger } = require('@librechat/data-schemas');
 const { CacheKeys, defaultSocialLogins, Constants } = require('librechat-data-provider');
 const { getCustomConfig } = require('~/server/services/Config/getCustomConfig');
 const { getLdapConfig } = require('~/server/services/Config/ldap');
+const OrganizationMCPService = require('~/server/services/OrganizationMCP');
 const { getProjectByName } = require('~/models/Project');
 const { isEnabled } = require('~/server/utils');
 const { getLogStores } = require('~/cache');
@@ -99,13 +100,25 @@ router.get('/', async function (req, res) {
       staticBundlerURL: process.env.SANDPACK_STATIC_BUNDLER_URL,
     };
 
+    // Initialize MCP service
+    const mcpService = new OrganizationMCPService();
+    
+    // Get user from request (you may need to adjust this based on your auth setup)
+    const user = req.user || { organization_id: process.env.DEFAULT_ORGANIZATION_ID };
+    
+    // Get MCP configuration from Supabase
+    const mcpConfig = await mcpService.getUserMCPConfig(user);
+    
     payload.mcpServers = {};
-    const config = await getCustomConfig();
-    if (config?.mcpServers != null) {
-      for (const serverName in config.mcpServers) {
-        const serverConfig = config.mcpServers[serverName];
+    if (mcpConfig && Object.keys(mcpConfig).length > 0) {
+      for (const serverName in mcpConfig) {
+        const serverConfig = mcpConfig[serverName];
         payload.mcpServers[serverName] = {
-          customUserVars: serverConfig?.customUserVars || {},
+          type: serverConfig.type || 'sse',
+          url: serverConfig.url,
+          timeout: serverConfig.timeout || 60000,
+          oauth: serverConfig.oauth,
+          customUserVars: serverConfig.customUserVars || {},
         };
       }
     }
