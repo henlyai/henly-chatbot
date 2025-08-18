@@ -148,7 +148,8 @@ const getAvailableTools = async (req, res) => {
 
     let pluginManifest = availableTools;
     const customConfig = await getCustomConfig();
-    if (customConfig?.mcpServers != null) {
+    const mcpConfig = customConfig?.mcpServers ?? req.app.locals?.mcpConfig;
+    if (mcpConfig != null) {
       const mcpManager = getMCPManager();
       const flowsCache = getLogStores(CacheKeys.FLOWS);
       const flowManager = flowsCache ? getFlowStateManager(flowsCache) : null;

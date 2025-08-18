@@ -113,11 +113,20 @@ router.get('/', async function (req, res) {
     if (mcpConfig && Object.keys(mcpConfig).length > 0) {
       for (const serverName in mcpConfig) {
         const serverConfig = mcpConfig[serverName];
+        // Do not expose secrets in startup config
+        const safeOauth = serverConfig.oauth
+          ? {
+              authorization_url: serverConfig.oauth.authorization_url,
+              token_url: serverConfig.oauth.token_url,
+              scope: serverConfig.oauth.scope,
+              redirect_uri: serverConfig.oauth.redirect_uri,
+            }
+          : undefined;
         payload.mcpServers[serverName] = {
           type: serverConfig.type || 'sse',
           url: serverConfig.url,
           timeout: serverConfig.timeout || 60000,
-          oauth: serverConfig.oauth,
+          oauth: safeOauth,
           customUserVars: serverConfig.customUserVars || {},
         };
       }

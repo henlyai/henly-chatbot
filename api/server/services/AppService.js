@@ -77,8 +77,27 @@ const AppService = async (app) => {
 
   await setCachedTools(availableTools, { isGlobal: true });
 
-  // Store MCP config for later initialization
-  const mcpConfig = config.mcpServers || null;
+  // Store MCP config for later initialization. If YAML is missing, load from Supabase by org.
+  let mcpConfig = config.mcpServers || null;
+  if (!mcpConfig) {
+    try {
+      const OrganizationMCPService = require('../services/OrganizationMCP');
+      const orgSvc = new OrganizationMCPService();
+      const orgId = process.env.DEFAULT_ORGANIZATION_ID;
+      if (orgId) {
+        const fromSupabase = await orgSvc.getOrganizationMCPServers(orgId);
+        if (fromSupabase && Object.keys(fromSupabase).length > 0) {
+          mcpConfig = fromSupabase;
+        }
+      }
+      if (!mcpConfig) {
+        mcpConfig = orgSvc.getDefaultMCPConfig();
+      }
+    } catch (e) {
+      // Fallback to no MCP if Supabase not configured
+      mcpConfig = null;
+    }
+  }
 
   const socialLogins =
     config?.registration?.socialLogins ?? configDefaults?.registration?.socialLogins;
