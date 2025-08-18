@@ -20,9 +20,6 @@ registration:
 # Custom interface configuration
 interface:
   customWelcome: "Welcome {{user.name}}! How Can I Help?"
-  # MCP Servers UI configuration
-  mcpServers:
-    placeholder: 'MCP Servers'
   # Privacy policy settings
   privacyPolicy:
     externalUrl: 'https://librechat.ai/privacy-policy'
