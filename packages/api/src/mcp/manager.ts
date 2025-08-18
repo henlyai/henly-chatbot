@@ -117,42 +117,9 @@ export class MCPManager {
 
         const connection = new MCPConnection(serverName, config, undefined, tokens);
 
-        /** Listen for OAuth requirements */
-        logger.info(`[MCP][${serverName}] Setting up OAuth event listener`);
-        connection.on('oauthRequired', async (data) => {
-          logger.debug(`[MCP][${serverName}] oauthRequired event received`);
-          const result = await this.handleOAuthRequired({
-            ...data,
-            flowManager,
-          });
-
-          if (result?.tokens && tokenMethods?.createToken) {
-            try {
-              connection.setOAuthTokens(result.tokens);
-              await MCPTokenStorage.storeTokens({
-                userId: CONSTANTS.SYSTEM_USER_ID,
-                serverName,
-                tokens: result.tokens,
-                createToken: tokenMethods.createToken,
-                updateToken: tokenMethods.updateToken,
-                findToken: tokenMethods.findToken,
-                clientInfo: result.clientInfo,
-              });
-              logger.info(`[MCP][${serverName}] OAuth tokens saved to storage`);
-            } catch (error) {
-              logger.error(`[MCP][${serverName}] Failed to save OAuth tokens to storage`, error);
-            }
-          }
-
-          // Only emit oauthHandled if we actually got tokens (OAuth succeeded)
-          if (result?.tokens) {
-            connection.emit('oauthHandled');
-          } else {
-            // OAuth failed, emit oauthFailed to properly reject the promise
-            logger.warn(`[MCP][${serverName}] OAuth failed, emitting oauthFailed event`);
-            connection.emit('oauthFailed', new Error('OAuth authentication failed'));
-          }
-        });
+        // Skip OAuth event listener setup for app-level connections
+        // OAuth will be handled during user-specific tool calls, not during app-level initialization
+        logger.info(`[MCP][${serverName}] Skipping OAuth event listener for app-level connection`);
 
         try {
           const connectTimeout = config.initTimeout ?? 30000;
