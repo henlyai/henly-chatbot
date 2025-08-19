@@ -92,8 +92,10 @@ app.get('/sse', (req, res) => {
     }
   };
 
-  // Send initial connection established message
-  res.write(':\n\n'); // Keep-alive comment to establish connection
+  console.log('SSE connection established');
+
+  // Send initial keep-alive to establish connection
+  res.write(':\n\n');
 
   // Keep track of initialization state
   let initialized = false;
@@ -102,76 +104,92 @@ app.get('/sse', (req, res) => {
   req.on('data', (chunk) => {
     try {
       const data = chunk.toString();
+      console.log('Received data:', data);
+      
       const lines = data.split('\n');
       
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           const messageData = line.substring(6);
-          const message = JSON.parse(messageData);
+          console.log('Processing message data:', messageData);
           
-          console.log('Received message:', message);
-          
-          // Handle initialization request
-          if (message.method === 'initialize' && !initialized) {
-            const initResponse = {
-              jsonrpc: "2.0",
-              id: message.id,
-              result: {
-                protocolVersion: "2024-11-05",
-                capabilities: {
-                  tools: tools,
-                  resources: {}
-                },
-                serverInfo: {
-                  name: "Google Drive MCP Server",
-                  version: "1.0.0"
-                }
-              }
-            };
+          try {
+            const message = JSON.parse(messageData);
+            console.log('Parsed message:', message);
             
-            res.write(`data: ${JSON.stringify(initResponse)}\n\n`);
-            initialized = true;
-            console.log('MCP initialization completed');
-          }
-          
-          // Handle tools/list request
-          else if (message.method === 'tools/list' && initialized) {
-            const toolsResponse = {
-              jsonrpc: "2.0",
-              id: message.id,
-              result: {
-                tools: Object.values(tools)
-              }
-            };
-            
-            res.write(`data: ${JSON.stringify(toolsResponse)}\n\n`);
-          }
-          
-          // Handle tools/call request
-          else if (message.method === 'tools/call' && initialized) {
-            const toolName = message.params.name;
-            const args = message.params.arguments || {};
-            
-            // For now, return a placeholder response
-            const callResponse = {
-              jsonrpc: "2.0",
-              id: message.id,
-              result: {
-                content: [
-                  {
-                    type: "text",
-                    text: `Tool ${toolName} called with args: ${JSON.stringify(args)}`
+            // Handle initialization request
+            if (message.method === 'initialize' && !initialized) {
+              console.log('Handling initialize request');
+              const initResponse = {
+                jsonrpc: "2.0",
+                id: message.id,
+                result: {
+                  protocolVersion: "2024-11-05",
+                  capabilities: {
+                    tools: tools,
+                    resources: {}
+                  },
+                  serverInfo: {
+                    name: "Google Drive MCP Server",
+                    version: "1.0.0"
                   }
-                ]
-              }
-            };
+                }
+              };
+              
+              const responseData = `data: ${JSON.stringify(initResponse)}\n\n`;
+              console.log('Sending init response:', responseData);
+              res.write(responseData);
+              initialized = true;
+              console.log('MCP initialization completed');
+            }
             
-            res.write(`data: ${JSON.stringify(callResponse)}\n\n`);
+            // Handle tools/list request
+            else if (message.method === 'tools/list' && initialized) {
+              console.log('Handling tools/list request');
+              const toolsResponse = {
+                jsonrpc: "2.0",
+                id: message.id,
+                result: {
+                  tools: Object.values(tools)
+                }
+              };
+              
+              const responseData = `data: ${JSON.stringify(toolsResponse)}\n\n`;
+              console.log('Sending tools response:', responseData);
+              res.write(responseData);
+            }
+            
+            // Handle tools/call request
+            else if (message.method === 'tools/call' && initialized) {
+              console.log('Handling tools/call request');
+              const toolName = message.params.name;
+              const args = message.params.arguments || {};
+              
+              // For now, return a placeholder response
+              const callResponse = {
+                jsonrpc: "2.0",
+                id: message.id,
+                result: {
+                  content: [
+                    {
+                      type: "text",
+                      text: `Tool ${toolName} called with args: ${JSON.stringify(args)}`
+                    }
+                  ]
+                }
+              };
+              
+              const responseData = `data: ${JSON.stringify(callResponse)}\n\n`;
+              console.log('Sending call response:', responseData);
+              res.write(responseData);
+            }
+          } catch (parseError) {
+            console.error('Error parsing JSON:', parseError);
           }
         }
       }
     } catch (error) {
-      console.error('Error processing message:', error);
+      console.error('Error processing data:', error);
     }
   });
 
@@ -183,6 +201,11 @@ app.get('/sse', (req, res) => {
   req.on('close', () => {
     clearInterval(interval);
     console.log('SSE connection closed');
+  });
+
+  req.on('error', (error) => {
+    console.error('SSE connection error:', error);
+    clearInterval(interval);
   });
 });
 
