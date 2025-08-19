@@ -63,57 +63,31 @@ export class MCPManager {
         /** Process env for app-level connections */
         const config = processMCPEnv(_config);
 
-        /** Existing tokens for system-level connections */
-        let tokens: MCPOAuthTokens | null = null;
-        if (tokenMethods?.findToken) {
-          try {
-            /** Refresh function for app-level connections */
-            const refreshTokensFunction = async (
-              refreshToken: string,
-              metadata: {
-                userId: string;
-                serverName: string;
-                identifier: string;
-                clientInfo?: OAuthClientInformation;
-              },
-            ) => {
-              /** URL from config if available */
-              const serverUrl = (config as t.SSEOptions | t.StreamableHTTPOptions).url;
-              return await MCPOAuthHandler.refreshOAuthTokens(
-                refreshToken,
-                {
-                  serverName: metadata.serverName,
-                  serverUrl,
-                  clientInfo: metadata.clientInfo,
-                },
-                config.oauth,
-              );
-            };
+        // For app-level connections, don't load OAuth tokens
+        // OAuth will be handled during user-specific tool calls
+        let tokens = null;
+        
+        // Only load tokens for user-specific connections (not app-level)
+        // if (tokenMethods) {
+        //   try {
+        //     const refreshTokensFunction = async () => {
+        //       return await this.refreshTokens({
+        //         userId: CONSTANTS.SYSTEM_USER_ID,
+        //         serverName,
+        //         findToken: tokenMethods.findToken,
+        //         refreshTokens: refreshTokensFunction,
+        //         createToken: tokenMethods.createToken,
+        //         updateToken: tokenMethods.updateToken,
+        //       });
+        //     };
+        //   } catch {
+        //     logger.debug(`[MCP][${serverName}] No existing tokens found`);
+        //   }
+        // }
 
-            /** Flow state to prevent concurrent token operations */
-            const tokenFlowId = `tokens:${CONSTANTS.SYSTEM_USER_ID}:${serverName}`;
-            tokens = await flowManager.createFlowWithHandler(
-              tokenFlowId,
-              'mcp_get_tokens',
-              async () => {
-                return await MCPTokenStorage.getTokens({
-                  userId: CONSTANTS.SYSTEM_USER_ID,
-                  serverName,
-                  findToken: tokenMethods.findToken,
-                  refreshTokens: refreshTokensFunction,
-                  createToken: tokenMethods.createToken,
-                  updateToken: tokenMethods.updateToken,
-                });
-              },
-            );
-          } catch {
-            logger.debug(`[MCP][${serverName}] No existing tokens found`);
-          }
-        }
-
-        if (tokens) {
-          logger.info(`[MCP][${serverName}] Loaded OAuth tokens`);
-        }
+        // if (tokens) {
+        //   logger.info(`[MCP][${serverName}] Loaded OAuth tokens`);
+        // }
 
         const connection = new MCPConnection(serverName, config, undefined, tokens);
 
