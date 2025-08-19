@@ -92,6 +92,9 @@ app.get('/sse', (req, res) => {
     }
   };
 
+  // Send initial connection established message
+  res.write(':\n\n'); // Keep-alive comment to establish connection
+
   // Keep track of initialization state
   let initialized = false;
 
@@ -105,6 +108,8 @@ app.get('/sse', (req, res) => {
         if (line.startsWith('data: ')) {
           const messageData = line.substring(6);
           const message = JSON.parse(messageData);
+          
+          console.log('Received message:', message);
           
           // Handle initialization request
           if (message.method === 'initialize' && !initialized) {
@@ -177,6 +182,7 @@ app.get('/sse', (req, res) => {
 
   req.on('close', () => {
     clearInterval(interval);
+    console.log('SSE connection closed');
   });
 });
 
