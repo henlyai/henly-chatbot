@@ -859,7 +859,10 @@ export class MCPManager {
         this.updateUserLastActivity(userId);
       }
       this.checkIdleConnections();
-      return formatToolContent(result, provider);
+      
+      // Cast the result to the expected type for formatToolContent
+      const formattedResult = result as t.MCPToolCallResponse;
+      return formatToolContent(formattedResult, provider);
     } catch (error) {
       // Log with context and re-throw or handle as needed
       logger.error(`${logPrefix}[${toolName}] Tool call failed`, error);

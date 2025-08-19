@@ -18,24 +18,23 @@ class OrganizationMCPService {
     try {
       logger.info(`[OrganizationMCP] Fetching MCP servers for organization: ${organizationId}`);
       
-      const { data: mcpServers, error } = await this.supabase
+      // Log the environment variables to verify they're set
+      logger.info(`[OrganizationMCP] SUPABASE_URL: ${process.env.SUPABASE_URL ? 'SET' : 'NOT SET'}`);
+      logger.info(`[OrganizationMCP] SUPABASE_ANON_KEY: ${process.env.SUPABASE_ANON_KEY ? 'SET' : 'NOT SET'}`);
+      
+      let { data: mcpServers, error } = await this.supabase
         .from('mcp_servers')
-        .select('id, name, description, endpoint, capabilities, is_active, organization_id')
+        .select('id, name, description, endpoint, capabilities, is_active')
         .eq('organization_id', organizationId)
         .eq('is_active', true);
 
       if (error) {
-        logger.error('[OrganizationMCP] Error fetching MCP servers:', error);
-        return {};
+        logger.error(`[OrganizationMCP] Error fetching MCP servers from Supabase: ${error.message}`);
+        return null;
       }
 
-      logger.info(`[OrganizationMCP] Found ${mcpServers?.length || 0} MCP servers in database`);
-      
-      if (mcpServers && mcpServers.length > 0) {
-        mcpServers.forEach(server => {
-          logger.info(`[OrganizationMCP] Server: ${server.name}, Endpoint: ${server.endpoint}, Active: ${server.is_active}`);
-        });
-      }
+      logger.info(`[OrganizationMCP] Raw Supabase result for ${organizationId}: ${JSON.stringify(mcpServers)}`);
+      logger.info(`[OrganizationMCP] Found ${mcpServers ? mcpServers.length : 0} MCP servers in database`);
 
       // Convert to LibreChat format
       const librechatConfig = {};
@@ -57,16 +56,18 @@ class OrganizationMCPService {
             scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
             client_id: process.env.GOOGLE_CLIENT_ID,
             client_secret: process.env.GOOGLE_CLIENT_SECRET,
-            redirect_uri: `${server.endpoint}/oauth/callback`
+            redirect_uri: `${server.endpoint.replace('/sse', '')}/oauth/callback`
           };
           logger.info(`[OrganizationMCP] Added OAuth config for Google Drive MCP (for MCP client compatibility)`);
         }
+
+        logger.info(`[OrganizationMCP] Added MCP config for ${server.name}`);
       }
 
       logger.info(`[OrganizationMCP] Loaded ${Object.keys(librechatConfig).length} MCP servers for organization ${organizationId}`);
       logger.info(`[OrganizationMCP] Final config keys: ${Object.keys(librechatConfig).join(', ')}`);
-      return librechatConfig;
 
+      return librechatConfig;
     } catch (error) {
       logger.error('[OrganizationMCP] Error in getOrganizationMCPServers:', error);
       return {};
