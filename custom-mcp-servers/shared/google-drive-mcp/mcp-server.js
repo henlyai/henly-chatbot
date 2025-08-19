@@ -2,6 +2,33 @@ import express from 'express';
 
 const app = express();
 
+// CORS middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  console.log(`🌐 CORS request from origin: ${origin}`);
+  
+  // Allow requests from LibreChat domain
+  if (origin && (origin.includes('railway.app') || origin.includes('localhost'))) {
+    res.header('Access-Control-Allow-Origin', origin);
+    console.log(`✅ CORS allowed for origin: ${origin}`);
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
+    console.log(`🌍 CORS allowed for all origins (fallback)`);
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    console.log(`🔄 Handling OPTIONS preflight request`);
+    res.sendStatus(200);
+    return;
+  }
+  
+  next();
+});
+
 // Google Drive API tools
 const tools = {
   "search_file": {

@@ -206,6 +206,7 @@ export class MCPConnection extends EventEmitter {
             eventSourceInit: {
               fetch: (url, init) => {
                 const urlString = url.toString();
+                console.log(`[DEBUG] SSE fetch URL: ${urlString}`);
                 logger.info(`${this.getLogPrefix()} SSE fetch called for URL: ${urlString}`);
                 logger.info(`${this.getLogPrefix()} SSE fetch init:`, JSON.stringify(init, null, 2));
                 
@@ -216,10 +217,12 @@ export class MCPConnection extends EventEmitter {
                   ...init,
                   headers: fetchHeaders,
                 }).then(response => {
+                  console.log(`[DEBUG] SSE fetch response status: ${response.status}`);
                   logger.info(`${this.getLogPrefix()} SSE fetch response status: ${response.status}`);
                   logger.info(`${this.getLogPrefix()} SSE fetch response headers:`, Object.fromEntries(response.headers.entries()));
                   return response;
                 }).catch(error => {
+                  console.error(`[DEBUG] SSE fetch error:`, error);
                   logger.error(`${this.getLogPrefix()} SSE fetch error:`, error);
                   throw error;
                 });
