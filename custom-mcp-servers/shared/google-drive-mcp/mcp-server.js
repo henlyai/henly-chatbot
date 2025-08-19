@@ -312,6 +312,22 @@ const tools = {
   }
 };
 
+// Simple test endpoint
+app.get('/test', (req, res) => {
+  console.log('🧪 Test endpoint called');
+  res.json({ 
+    status: 'ok', 
+    message: 'MCP server is accessible',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Log all requests
+app.use((req, res, next) => {
+  console.log(`📥 ${req.method} ${req.path} - Headers:`, req.headers);
+  next();
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   console.log('🏥 Health check request received');
