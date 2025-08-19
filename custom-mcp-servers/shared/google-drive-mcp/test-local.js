@@ -54,6 +54,7 @@ async function testMCPServer() {
           }
         }
       }
+
       console.log('✅ SSE test completed successfully');
     });
 
