@@ -178,14 +178,26 @@ export class MCPConnection extends EventEmitter {
           this.url = options.url;
           const url = new URL(options.url);
           logger.info(`${this.getLogPrefix()} Creating SSE transport: ${url.toString()}`);
+          logger.info(`${this.getLogPrefix()} SSE transport options:`, {
+            hasOAuthTokens: !!this.oauthTokens?.access_token,
+            headers: options.headers,
+            timeout: options.timeout,
+            initTimeout: options.initTimeout
+          });
+          
           const abortController = new AbortController();
 
           /** Add OAuth token to headers if available */
           const headers = { ...options.headers };
           if (this.oauthTokens?.access_token) {
             headers['Authorization'] = `Bearer ${this.oauthTokens.access_token}`;
+            logger.info(`${this.getLogPrefix()} Added OAuth token to headers`);
+          } else {
+            logger.info(`${this.getLogPrefix()} No OAuth tokens available`);
           }
 
+          logger.info(`${this.getLogPrefix()} Creating SSEClientTransport with headers:`, headers);
+          
           const transport = new SSEClientTransport(url, {
             requestInit: {
               headers,
@@ -193,6 +205,7 @@ export class MCPConnection extends EventEmitter {
             },
             eventSourceInit: {
               fetch: (url, init) => {
+                logger.info(`${this.getLogPrefix()} SSE fetch called for:`, url.toString());
                 const fetchHeaders = new Headers(Object.assign({}, init?.headers, headers));
                 return fetch(url, {
                   ...init,
@@ -201,6 +214,8 @@ export class MCPConnection extends EventEmitter {
               },
             },
           });
+
+          logger.info(`${this.getLogPrefix()} SSEClientTransport created successfully`);
 
           transport.onclose = () => {
             logger.info(`${this.getLogPrefix()} SSE transport closed`);
@@ -217,6 +232,7 @@ export class MCPConnection extends EventEmitter {
           };
 
           this.setupTransportErrorHandlers(transport);
+          logger.info(`${this.getLogPrefix()} SSE transport setup complete`);
           return transport;
         }
 
@@ -361,34 +377,46 @@ export class MCPConnection extends EventEmitter {
 
   async connectClient(): Promise<void> {
     if (this.connectionState === 'connected') {
+      logger.info(`${this.getLogPrefix()} Already connected, skipping`);
       return;
     }
 
     if (this.connectPromise) {
+      logger.info(`${this.getLogPrefix()} Connection already in progress, waiting`);
       return this.connectPromise;
     }
 
     if (this.shouldStopReconnecting) {
+      logger.info(`${this.getLogPrefix()} Reconnection stopped, skipping`);
       return;
     }
 
+    logger.info(`${this.getLogPrefix()} Starting connectClient`);
     this.emit('connectionChange', 'connecting');
 
     this.connectPromise = (async () => {
       try {
+        logger.info(`${this.getLogPrefix()} Step 1: Cleaning up existing transport`);
         if (this.transport) {
           try {
             await this.client.close();
             this.transport = null;
+            logger.info(`${this.getLogPrefix()} Existing transport closed`);
           } catch (error) {
             logger.warn(`${this.getLogPrefix()} Error closing connection:`, error);
           }
         }
 
+        logger.info(`${this.getLogPrefix()} Step 2: Constructing transport`);
         this.transport = this.constructTransport(this.options);
+        logger.info(`${this.getLogPrefix()} Transport constructed:`, this.transport.constructor.name);
+        
+        logger.info(`${this.getLogPrefix()} Step 3: Setting up debug handlers`);
         this.setupTransportDebugHandlers();
 
         const connectTimeout = this.options.initTimeout ?? 120000;
+        logger.info(`${this.getLogPrefix()} Step 4: Connecting with timeout ${connectTimeout}ms`);
+        
         await Promise.race([
           this.client.connect(this.transport),
           new Promise((_resolve, reject) =>
@@ -399,10 +427,14 @@ export class MCPConnection extends EventEmitter {
           ),
         ]);
 
+        logger.info(`${this.getLogPrefix()} Step 5: Client connection successful`);
         this.connectionState = 'connected';
         this.emit('connectionChange', 'connected');
         this.reconnectAttempts = 0;
+        logger.info(`${this.getLogPrefix()} Connection fully established`);
       } catch (error) {
+        logger.error(`${this.getLogPrefix()} connectClient failed:`, error);
+        
         // Check if it's an OAuth authentication error
         if (this.isOAuthError(error)) {
           logger.warn(`${this.getLogPrefix()} OAuth authentication required`);

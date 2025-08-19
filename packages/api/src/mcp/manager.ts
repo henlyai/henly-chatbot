@@ -217,17 +217,30 @@ export class MCPManager {
     /** Whether OAuth has been handled by the connection */
     let oauthHandled = false;
 
+    logger.info(`${logPrefix} Starting initializeServer with handleOAuth=${handleOAuth}`);
+
     while (attempts < maxAttempts) {
       try {
+        logger.info(`${logPrefix} Connection attempt ${attempts + 1}/${maxAttempts}`);
+        logger.info(`${logPrefix} Calling connection.connect()...`);
+        
         await connection.connect();
+        
+        logger.info(`${logPrefix} connection.connect() completed, checking connection status...`);
+        
         if (await connection.isConnected()) {
+          logger.info(`${logPrefix} Connection successful and verified as connected`);
           return;
         }
+        
+        logger.error(`${logPrefix} Connection attempt succeeded but status is not connected`);
         throw new Error('Connection attempt succeeded but status is not connected');
       } catch (error) {
         attempts++;
+        logger.error(`${logPrefix} Connection attempt ${attempts} failed:`, error);
 
         if (this.isOAuthError(error)) {
+          logger.info(`${logPrefix} Detected OAuth error`);
           // Only handle OAuth if requested (not already handled by event listener)
           if (handleOAuth) {
             /** Check if OAuth was already handled by the connection */
@@ -256,7 +269,10 @@ export class MCPManager {
           logger.error(`${logPrefix} Failed to connect after ${maxAttempts} attempts`, error);
           throw error; // Re-throw the last error
         }
-        await new Promise((resolve) => setTimeout(resolve, 2000 * attempts));
+        
+        const delay = 2000 * attempts;
+        logger.info(`${logPrefix} Waiting ${delay}ms before retry...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
