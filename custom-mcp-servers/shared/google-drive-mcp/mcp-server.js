@@ -97,102 +97,25 @@ app.get('/sse', (req, res) => {
   // Send initial keep-alive to establish connection
   res.write(':\n\n');
 
-  // Keep track of initialization state
-  let initialized = false;
-
-  // Handle incoming messages from the client
-  req.on('data', (chunk) => {
-    try {
-      const data = chunk.toString();
-      console.log('Received data:', data);
-      
-      const lines = data.split('\n');
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const messageData = line.substring(6);
-          console.log('Processing message data:', messageData);
-          
-          try {
-            const message = JSON.parse(messageData);
-            console.log('Parsed message:', message);
-            
-            // Handle initialization request
-            if (message.method === 'initialize' && !initialized) {
-              console.log('Handling initialize request');
-              const initResponse = {
-                jsonrpc: "2.0",
-                id: message.id,
-                result: {
-                  protocolVersion: "2024-11-05",
-                  capabilities: {
-                    tools: tools,
-                    resources: {}
-                  },
-                  serverInfo: {
-                    name: "Google Drive MCP Server",
-                    version: "1.0.0"
-                  }
-                }
-              };
-              
-              const responseData = `data: ${JSON.stringify(initResponse)}\n\n`;
-              console.log('Sending init response:', responseData);
-              res.write(responseData);
-              initialized = true;
-              console.log('MCP initialization completed');
-            }
-            
-            // Handle tools/list request
-            else if (message.method === 'tools/list' && initialized) {
-              console.log('Handling tools/list request');
-              const toolsResponse = {
-                jsonrpc: "2.0",
-                id: message.id,
-                result: {
-                  tools: Object.values(tools)
-                }
-              };
-              
-              const responseData = `data: ${JSON.stringify(toolsResponse)}\n\n`;
-              console.log('Sending tools response:', responseData);
-              res.write(responseData);
-            }
-            
-            // Handle tools/call request
-            else if (message.method === 'tools/call' && initialized) {
-              console.log('Handling tools/call request');
-              const toolName = message.params.name;
-              const args = message.params.arguments || {};
-              
-              // Check if OAuth is required for this tool call
-              // For now, return a placeholder response indicating OAuth is needed
-              const callResponse = {
-                jsonrpc: "2.0",
-                id: message.id,
-                error: {
-                  code: -32001,
-                  message: "OAuth authentication required for Google Drive access",
-                  data: {
-                    oauth_required: true,
-                    tool_name: toolName
-                  }
-                }
-              };
-              
-              const responseData = `data: ${JSON.stringify(callResponse)}\n\n`;
-              console.log('Sending OAuth required response:', responseData);
-              res.write(responseData);
-            }
-          } catch (parseError) {
-            console.error('Error parsing JSON:', parseError);
-          }
-        }
+  // Send initialization message proactively (LibreChat expects this)
+  const initMessage = {
+    jsonrpc: "2.0",
+    id: 1,
+    result: {
+      protocolVersion: "2024-11-05",
+      capabilities: {
+        tools: tools,
+        resources: {}
+      },
+      serverInfo: {
+        name: "Google Drive MCP Server",
+        version: "1.0.0"
       }
-    } catch (error) {
-      console.error('Error processing data:', error);
     }
-  });
+  };
+
+  console.log('Sending initialization message:', JSON.stringify(initMessage));
+  res.write(`data: ${JSON.stringify(initMessage)}\n\n`);
 
   // Keep connection alive
   const interval = setInterval(() => {
