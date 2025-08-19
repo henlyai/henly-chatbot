@@ -165,22 +165,23 @@ app.get('/sse', (req, res) => {
               const toolName = message.params.name;
               const args = message.params.arguments || {};
               
-              // For now, return a placeholder response
+              // Check if OAuth is required for this tool call
+              // For now, return a placeholder response indicating OAuth is needed
               const callResponse = {
                 jsonrpc: "2.0",
                 id: message.id,
-                result: {
-                  content: [
-                    {
-                      type: "text",
-                      text: `Tool ${toolName} called with args: ${JSON.stringify(args)}`
-                    }
-                  ]
+                error: {
+                  code: -32001,
+                  message: "OAuth authentication required for Google Drive access",
+                  data: {
+                    oauth_required: true,
+                    tool_name: toolName
+                  }
                 }
               };
               
               const responseData = `data: ${JSON.stringify(callResponse)}\n\n`;
-              console.log('Sending call response:', responseData);
+              console.log('Sending OAuth required response:', responseData);
               res.write(responseData);
             }
           } catch (parseError) {
