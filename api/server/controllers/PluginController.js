@@ -55,6 +55,9 @@ const getAvailablePluginsController = async (req, res) => {
     const cache = getLogStores(CacheKeys.CONFIG_STORE);
     const cachedPlugins = await cache.get(CacheKeys.PLUGINS);
     if (cachedPlugins) {
+      console.log('🔍 [PluginController] Returning cached plugins:', cachedPlugins.length);
+      const mcpPlugins = cachedPlugins.filter(p => p.pluginKey && p.pluginKey.includes('_mcp_'));
+      console.log('🔍 [PluginController] Cached MCP plugins:', mcpPlugins.length);
       res.status(200).json(cachedPlugins);
       return;
     }
@@ -62,6 +65,10 @@ const getAvailablePluginsController = async (req, res) => {
     /** @type {{ filteredTools: string[], includedTools: string[] }} */
     const { filteredTools = [], includedTools = [] } = req.app.locals;
     const pluginManifest = availableTools;
+
+    console.log('🔍 [PluginController] Available tools from manifest:', pluginManifest.length);
+    const mcpManifestTools = pluginManifest.filter(p => p.pluginKey && p.pluginKey.includes('_mcp_'));
+    console.log('🔍 [PluginController] MCP tools in manifest:', mcpManifestTools.length);
 
     const uniquePlugins = filterUniquePlugins(pluginManifest);
     let authenticatedPlugins = [];
@@ -79,9 +86,17 @@ const getAvailablePluginsController = async (req, res) => {
       plugins = plugins.filter((plugin) => !filteredTools.includes(plugin.pluginKey));
     }
 
+    console.log('🔍 [PluginController] Final plugins count:', plugins.length);
+    const mcpPlugins = plugins.filter(p => p.pluginKey && p.pluginKey.includes('_mcp_'));
+    console.log('🔍 [PluginController] Final MCP plugins:', mcpPlugins.length);
+    if (mcpPlugins.length > 0) {
+      console.log('🔍 [PluginController] MCP plugin keys:', mcpPlugins.map(p => p.pluginKey));
+    }
+
     await cache.set(CacheKeys.PLUGINS, plugins);
     res.status(200).json(plugins);
   } catch (error) {
+    console.error('🔍 [PluginController] Error:', error);
     res.status(500).json({ message: error.message });
   }
 };

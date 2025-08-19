@@ -48,20 +48,9 @@ class OrganizationMCPService {
           capabilities: server.capabilities || []
         };
 
-        // Add OAuth configuration for Google Drive (needed for MCP client compatibility)
-        if (server.name === 'Google Drive') {
-          librechatConfig[server.name].oauth = {
-            authorization_url: 'https://accounts.google.com/o/oauth2/auth',
-            token_url: 'https://oauth2.googleapis.com/token',
-            scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file',
-            client_id: process.env.GOOGLE_CLIENT_ID,
-            client_secret: process.env.GOOGLE_CLIENT_SECRET,
-            redirect_uri: `${server.endpoint.replace('/sse', '')}/oauth/callback`
-          };
-          logger.info(`[OrganizationMCP] Added OAuth config for Google Drive MCP (for MCP client compatibility)`);
-        }
-
-        logger.info(`[OrganizationMCP] Added MCP config for ${server.name}`);
+        // Note: OAuth configuration removed for app-level connections
+        // OAuth will be handled dynamically when tools are used
+        logger.info(`[OrganizationMCP] Added MCP config for ${server.name} (without OAuth for app-level)`);
       }
 
       logger.info(`[OrganizationMCP] Loaded ${Object.keys(librechatConfig).length} MCP servers for organization ${organizationId}`);
