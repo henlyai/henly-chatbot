@@ -314,18 +314,29 @@ const tools = {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({
+  console.log('🏥 Health check request received');
+  console.log('🏥 Request headers:', req.headers);
+  
+  const healthResponse = {
     status: 'healthy',
     service: 'Google Drive MCP Server',
     version: '2.0.0',
     timestamp: new Date().toISOString(),
-    tools: Object.keys(tools).length
-  });
+    tools: Object.keys(tools).length,
+    tools_list: Object.keys(tools)
+  };
+  
+  console.log('🏥 Sending health response:', healthResponse);
+  res.json(healthResponse);
+  console.log('🏥 Health check response sent');
 });
 
 // SSE endpoint for MCP protocol
 app.get('/sse', (req, res) => {
-  console.log('SSE connection request received');
+  console.log('🔗 SSE connection request received');
+  console.log('🔗 Request headers:', req.headers);
+  console.log('🔗 Request method:', req.method);
+  console.log('🔗 Request URL:', req.url);
   
   // Set SSE headers
   res.writeHead(200, {
@@ -336,8 +347,11 @@ app.get('/sse', (req, res) => {
     'Access-Control-Allow-Headers': 'Cache-Control'
   });
 
+  console.log('🔗 SSE headers set, sending initial keep-alive');
+  
   // Send initial keep-alive to establish connection
   res.write(':\n\n');
+  console.log('🔗 Initial keep-alive sent');
 
   // Send initialization message proactively (LibreChat expects this)
   const initMessage = {
@@ -356,22 +370,59 @@ app.get('/sse', (req, res) => {
     }
   };
 
-  console.log('Sending initialization message with', Object.keys(tools).length, 'tools');
-  res.write(`data: ${JSON.stringify(initMessage)}\n\n`);
+  console.log('📤 Sending proactive initialization message with', Object.keys(tools).length, 'tools');
+  console.log('📤 Message ID:', initMessage.id);
+  console.log('📤 Tools included:', Object.keys(tools));
+  
+  const responseData = `data: ${JSON.stringify(initMessage)}\n\n`;
+  console.log('📤 Writing initialization data');
+  res.write(responseData);
+  console.log('📤 Initialization message sent successfully');
+
+  let messageCount = 0;
+
+  // Handle incoming messages from client (for future requests)
+  req.on('data', (chunk) => {
+    messageCount++;
+    console.log(`📨 Received data chunk #${messageCount}:`, chunk.toString());
+    
+    try {
+      const message = JSON.parse(chunk.toString());
+      console.log(`📨 Parsed message #${messageCount}:`, JSON.stringify(message, null, 2));
+      
+      if (message.method) {
+        console.log(`📨 Received method call: ${message.method}`);
+        // Handle other method calls here (tools/call, etc.)
+      } else {
+        console.log('📨 Received message without method:', message);
+      }
+    } catch (error) {
+      console.error('❌ Error parsing client message:', error);
+      console.error('❌ Raw chunk:', chunk.toString());
+    }
+  });
 
   // Keep connection alive
   const interval = setInterval(() => {
+    console.log('💓 Sending keep-alive ping');
     res.write(':\n\n'); // Keep-alive comment
   }, 30000);
 
   req.on('close', () => {
+    console.log('🔌 SSE connection closed by client');
+    console.log('📊 Connection stats - Messages received:', messageCount);
     clearInterval(interval);
-    console.log('SSE connection closed');
   });
 
   req.on('error', (error) => {
-    console.error('SSE connection error:', error);
+    console.error('💥 SSE connection error:', error);
+    console.error('💥 Error code:', error.code);
+    console.error('💥 Error message:', error.message);
     clearInterval(interval);
+  });
+
+  req.on('end', () => {
+    console.log('🏁 SSE connection ended');
   });
 });
 

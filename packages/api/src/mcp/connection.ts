@@ -217,6 +217,10 @@ export class MCPConnection extends EventEmitter {
 
           logger.info(`${this.getLogPrefix()} SSEClientTransport created successfully`);
 
+          transport.onmessage = (message) => {
+            logger.info(`${this.getLogPrefix()} Message received: ${JSON.stringify(message)}`);
+          };
+
           transport.onclose = () => {
             logger.info(`${this.getLogPrefix()} SSE transport closed`);
             this.emit('connectionChange', 'disconnected');
@@ -225,10 +229,6 @@ export class MCPConnection extends EventEmitter {
           transport.onerror = (error) => {
             logger.error(`${this.getLogPrefix()} SSE transport error:`, error);
             this.emitError(error, 'SSE transport error:');
-          };
-
-          transport.onmessage = (message) => {
-            logger.info(`${this.getLogPrefix()} Message received: ${JSON.stringify(message)}`);
           };
 
           this.setupTransportErrorHandlers(transport);
@@ -416,16 +416,21 @@ export class MCPConnection extends EventEmitter {
 
         const connectTimeout = this.options.initTimeout ?? 120000;
         logger.info(`${this.getLogPrefix()} Step 4: Connecting with timeout ${connectTimeout}ms`);
+        logger.info(`${this.getLogPrefix()} About to call this.client.connect(transport)`);
         
-        await Promise.race([
-          this.client.connect(this.transport),
-          new Promise((_resolve, reject) =>
-            setTimeout(
-              () => reject(new Error(`Connection timeout after ${connectTimeout}ms`)),
-              connectTimeout,
-            ),
+        const connectPromise = this.client.connect(this.transport);
+        const timeoutPromise = new Promise((_resolve, reject) =>
+          setTimeout(
+            () => {
+              logger.error(`${this.getLogPrefix()} Connection timeout reached after ${connectTimeout}ms`);
+              reject(new Error(`Connection timeout after ${connectTimeout}ms`));
+            },
+            connectTimeout,
           ),
-        ]);
+        );
+
+        logger.info(`${this.getLogPrefix()} Starting Promise.race between connect and timeout`);
+        await Promise.race([connectPromise, timeoutPromise]);
 
         logger.info(`${this.getLogPrefix()} Step 5: Client connection successful`);
         this.connectionState = 'connected';
