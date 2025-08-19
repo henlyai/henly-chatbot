@@ -92,24 +92,83 @@ app.get('/sse', (req, res) => {
     }
   };
 
-  // Send initialization message with tools in capabilities
-  const initMessage = {
-    jsonrpc: "2.0",
-    id: 1,
-    result: {
-      protocolVersion: "2024-11-05",
-      capabilities: {
-        tools: tools,
-        resources: {}
-      },
-      serverInfo: {
-        name: "Google Drive MCP Server",
-        version: "1.0.0"
-      }
-    }
-  };
+  // Keep track of initialization state
+  let initialized = false;
 
-  res.write(`data: ${JSON.stringify(initMessage)}\n\n`);
+  // Handle incoming messages from the client
+  req.on('data', (chunk) => {
+    try {
+      const data = chunk.toString();
+      const lines = data.split('\n');
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const messageData = line.substring(6);
+          const message = JSON.parse(messageData);
+          
+          // Handle initialization request
+          if (message.method === 'initialize' && !initialized) {
+            const initResponse = {
+              jsonrpc: "2.0",
+              id: message.id,
+              result: {
+                protocolVersion: "2024-11-05",
+                capabilities: {
+                  tools: tools,
+                  resources: {}
+                },
+                serverInfo: {
+                  name: "Google Drive MCP Server",
+                  version: "1.0.0"
+                }
+              }
+            };
+            
+            res.write(`data: ${JSON.stringify(initResponse)}\n\n`);
+            initialized = true;
+            console.log('MCP initialization completed');
+          }
+          
+          // Handle tools/list request
+          else if (message.method === 'tools/list' && initialized) {
+            const toolsResponse = {
+              jsonrpc: "2.0",
+              id: message.id,
+              result: {
+                tools: Object.values(tools)
+              }
+            };
+            
+            res.write(`data: ${JSON.stringify(toolsResponse)}\n\n`);
+          }
+          
+          // Handle tools/call request
+          else if (message.method === 'tools/call' && initialized) {
+            const toolName = message.params.name;
+            const args = message.params.arguments || {};
+            
+            // For now, return a placeholder response
+            const callResponse = {
+              jsonrpc: "2.0",
+              id: message.id,
+              result: {
+                content: [
+                  {
+                    type: "text",
+                    text: `Tool ${toolName} called with args: ${JSON.stringify(args)}`
+                  }
+                ]
+              }
+            };
+            
+            res.write(`data: ${JSON.stringify(callResponse)}\n\n`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error processing message:', error);
+    }
+  });
 
   // Keep connection alive
   const interval = setInterval(() => {
