@@ -233,19 +233,6 @@ app.get('/oauth/callback', async (req, res) => {
 app.get('/mcp', async (req, res) => {
   console.log('📡 Received GET request to /mcp (establishing SSE stream)');
   try {
-    // Set SSE headers
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Cache-Control',
-      'X-Accel-Buffering': 'no'
-    });
-
-    // Send initial keep-alive
-    res.write(':\n\n');
-
     // Create a new SSE transport for the client
     const transport = new SSEServerTransport('/messages', res);
     
