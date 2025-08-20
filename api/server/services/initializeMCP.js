@@ -109,7 +109,7 @@ async function initializeMCP(app) {
     });
 
     logger.info('[MCP] MCP manager initialization completed');
-    delete app.locals.mcpConfig;
+    // Don't delete app.locals.mcpConfig - PluginController needs it to load MCP tools
     const availableTools = await getCachedTools();
 
     if (!availableTools) {
