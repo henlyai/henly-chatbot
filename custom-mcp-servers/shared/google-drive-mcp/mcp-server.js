@@ -396,15 +396,35 @@ app.get('/sse', (req, res) => {
   res.write(':\n\n');
   console.log('🔗 Initial keep-alive sent');
 
-  // Wait a moment for connection to establish
-  setTimeout(() => {
-    console.log('⏳ Connection established, waiting for client requests...');
-  }, 100);
+  // Send initialization message immediately (LibreChat expects this)
+  const initMessage = {
+    jsonrpc: "2.0",
+    id: 1,
+    result: {
+      protocolVersion: "2024-11-05",
+      capabilities: {
+        tools: tools,
+        resources: {}
+      },
+      serverInfo: {
+        name: "Google Drive MCP Server",
+        version: "2.0.0"
+      }
+    }
+  };
 
-  let initRequestReceived = false;
+  console.log('📤 Sending initialization message immediately with', Object.keys(tools).length, 'tools');
+  console.log('📤 Message ID:', initMessage.id);
+  console.log('📤 Tools included:', Object.keys(tools));
+  
+  const responseData = `data: ${JSON.stringify(initMessage)}\n\n`;
+  console.log('📤 Writing initialization data immediately');
+  res.write(responseData);
+  console.log('📤 Initialization message sent successfully');
+
   let messageCount = 0;
 
-  // Handle incoming messages from client
+  // Handle incoming messages from client (for future requests)
   req.on('data', (chunk) => {
     messageCount++;
     console.log(`📨 Received data chunk #${messageCount}:`, chunk.toString());
@@ -418,62 +438,7 @@ app.get('/sse', (req, res) => {
       console.log(`📨 Message ID: ${message.id || 'undefined'}`);
       console.log(`📨 Message params:`, message.params || 'undefined');
       
-      // Check if this is an initialization request
-      if (message.method === 'initialize' && !initRequestReceived) {
-        console.log('🎯 Initialization request detected!');
-        initRequestReceived = true;
-        
-        // Send initialization response with empty capabilities
-        const initResponse = {
-          jsonrpc: "2.0",
-          id: message.id,
-          result: {
-            protocolVersion: "2024-11-05",
-            capabilities: {
-              tools: {},
-              resources: {}
-            },
-            serverInfo: {
-              name: "Google Drive MCP Server",
-              version: "2.0.0"
-            }
-          }
-        };
-
-        console.log('📤 Sending initialization response with empty capabilities');
-        console.log('📤 Response ID:', initResponse.id);
-        console.log('📤 Response capabilities:', JSON.stringify(initResponse.result.capabilities, null, 2));
-        
-        // Ensure proper SSE format: data: <json>\n\n
-        const initResponseData = `data: ${JSON.stringify(initResponse)}\n\n`;
-        console.log('📤 Writing initialization response data:', initResponseData);
-        res.write(initResponseData);
-        console.log('📤 Initialization response sent successfully');
-      }
-      // Check if this is a tools/list request
-      else if (message.method === 'tools/list') {
-        console.log('🔧 Tools/list request detected!');
-        
-        // Send tools list response
-        const toolsListResponse = {
-          jsonrpc: "2.0",
-          id: message.id,
-          result: {
-            tools: tools
-          }
-        };
-
-        console.log('📤 Sending tools list response with', Object.keys(tools).length, 'tools');
-        console.log('📤 Response ID:', toolsListResponse.id);
-        console.log('📤 Tools included:', Object.keys(tools));
-        
-        // Ensure proper SSE format: data: <json>\n\n
-        const toolsResponseData = `data: ${JSON.stringify(toolsListResponse)}\n\n`;
-        console.log('📤 Writing tools list response data:', toolsResponseData);
-        res.write(toolsResponseData);
-        console.log('📤 Tools list response sent successfully');
-      }
-      else if (message.method) {
+      if (message.method) {
         console.log(`📨 Received method call: ${message.method}`);
         console.log(`📨 Method params:`, message.params || 'undefined');
         // Handle other method calls here (tools/call, etc.)
@@ -487,22 +452,6 @@ app.get('/sse', (req, res) => {
       console.error('❌ Chunk buffer:', chunk);
     }
   });
-
-  // Add timeout to detect if client doesn't send initialization
-  setTimeout(() => {
-    if (!initRequestReceived) {
-      console.log('⏰ Timeout: No initialization request received within 10 seconds');
-      console.log('⏰ Connection may be hanging due to client not sending init request');
-      console.log('⏰ This suggests LibreChat is not sending the expected MCP protocol messages');
-    }
-  }, 10000);
-
-  // Add timeout to detect if client doesn't send tools/list request
-  setTimeout(() => {
-    if (initRequestReceived) {
-      console.log('⏰ Info: Initialization completed, waiting for tools/list request...');
-    }
-  }, 15000);
 
   // Keep connection alive
   const interval = setInterval(() => {
