@@ -56,7 +56,7 @@ const getAvailablePluginsController = async (req, res) => {
     const cachedPlugins = await cache.get(CacheKeys.PLUGINS);
     if (cachedPlugins) {
       console.log('🔍 [PluginController] Returning cached plugins:', cachedPlugins.length);
-      const mcpPlugins = cachedPlugins.filter(p => p.pluginKey && p.pluginKey.includes('_mcp_'));
+      const mcpPlugins = cachedPlugins.filter(p => p.pluginKey && p.pluginKey.includes(Constants.mcp_delimiter));
       console.log('🔍 [PluginController] Cached MCP plugins:', mcpPlugins.length);
       res.status(200).json(cachedPlugins);
       return;
@@ -66,28 +66,47 @@ const getAvailablePluginsController = async (req, res) => {
     const { filteredTools = [], includedTools = [] } = req.app.locals;
     let pluginManifest = availableTools;
 
+    console.log('🔍 [PluginController] Starting with static tools:', pluginManifest.length);
+    console.log('🔍 [PluginController] Static tool keys:', pluginManifest.map(p => p.pluginKey).slice(0, 5));
+
     // Load MCP tools if MCP configuration is available
     const customConfig = await getCustomConfig();
     const mcpConfig = customConfig?.mcpServers ?? req.app.locals?.mcpConfig;
+    
+    console.log('🔍 [PluginController] MCP config found:', !!mcpConfig);
+    if (mcpConfig) {
+      console.log('🔍 [PluginController] MCP config keys:', Object.keys(mcpConfig));
+    }
+    
     if (mcpConfig != null) {
       const mcpManager = getMCPManager();
       const flowsCache = getLogStores(CacheKeys.FLOWS);
       const flowManager = flowsCache ? getFlowStateManager(flowsCache) : null;
       const serverToolsCallback = createServerToolsCallback();
       const getServerTools = createGetServerTools();
+      
+      console.log('🔍 [PluginController] Loading MCP tools from manager...');
       const mcpTools = await mcpManager.loadManifestTools({
         flowManager,
         serverToolsCallback,
         getServerTools,
       });
+      
+      console.log('🔍 [PluginController] MCP tools loaded:', mcpTools.length);
+      console.log('🔍 [PluginController] MCP tool keys:', mcpTools.map(t => t.pluginKey));
+      
       pluginManifest = [...mcpTools, ...pluginManifest];
+      console.log('🔍 [PluginController] Combined manifest size:', pluginManifest.length);
     }
 
     console.log('🔍 [PluginController] Available tools from manifest:', pluginManifest.length);
-    const mcpManifestTools = pluginManifest.filter(p => p.pluginKey && p.pluginKey.includes('_mcp_'));
+    const mcpManifestTools = pluginManifest.filter(p => p.pluginKey && p.pluginKey.includes(Constants.mcp_delimiter));
     console.log('🔍 [PluginController] MCP tools in manifest:', mcpManifestTools.length);
+    console.log('🔍 [PluginController] MCP tool keys found:', mcpManifestTools.map(p => p.pluginKey));
 
     const uniquePlugins = filterUniquePlugins(pluginManifest);
+    console.log('🔍 [PluginController] After deduplication:', uniquePlugins.length);
+    
     let authenticatedPlugins = [];
     for (const plugin of uniquePlugins) {
       authenticatedPlugins.push(
@@ -99,15 +118,20 @@ const getAvailablePluginsController = async (req, res) => {
 
     if (includedTools.length > 0) {
       plugins = plugins.filter((plugin) => includedTools.includes(plugin.pluginKey));
+      console.log('🔍 [PluginController] After includedTools filter:', plugins.length);
     } else {
       plugins = plugins.filter((plugin) => !filteredTools.includes(plugin.pluginKey));
+      console.log('🔍 [PluginController] After filteredTools filter:', plugins.length);
     }
 
     console.log('🔍 [PluginController] Final plugins count:', plugins.length);
-    const mcpPlugins = plugins.filter(p => p.pluginKey && p.pluginKey.includes('_mcp_'));
+    const mcpPlugins = plugins.filter(p => p.pluginKey && p.pluginKey.includes(Constants.mcp_delimiter));
     console.log('🔍 [PluginController] Final MCP plugins:', mcpPlugins.length);
     if (mcpPlugins.length > 0) {
-      console.log('🔍 [PluginController] MCP plugin keys:', mcpPlugins.map(p => p.pluginKey));
+      console.log('🔍 [PluginController] Final MCP plugin keys:', mcpPlugins.map(p => p.pluginKey));
+    } else {
+      console.log('🔍 [PluginController] ⚠️  No MCP plugins found in final result!');
+      console.log('🔍 [PluginController] All plugin keys:', plugins.map(p => p.pluginKey));
     }
 
     await cache.set(CacheKeys.PLUGINS, plugins);
