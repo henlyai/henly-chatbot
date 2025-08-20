@@ -307,30 +307,46 @@ app.post('/sse', (req, res) => {
     // Update last activity
     session.lastActivity = Date.now();
     
-    // Handle different methods
+    // Handle different methods and send responses via SSE stream
     switch (method) {
       case 'initialize':
         console.log(`📨 Handling initialize request: ${id}`);
         const initResult = {
-          protocolVersion: "2024-11-05",
-          capabilities: {
-            tools: {},
-            resources: {}
-          },
-          serverInfo: {
-            name: "Google Drive MCP Server",
-            version: "2.0.0"
+          jsonrpc: "2.0",
+          id: id,
+          result: {
+            protocolVersion: "2024-11-05",
+            capabilities: {
+              tools: {},
+              resources: {}
+            },
+            serverInfo: {
+              name: "Google Drive MCP Server",
+              version: "2.0.0"
+            }
           }
         };
-        sendJsonRpcResponse(session.res, id, initResult);
+        
+        console.log('📤 Sending initialize response via SSE:', JSON.stringify(initResult, null, 2));
+        const initData = `data: ${JSON.stringify(initResult)}\n\n`;
+        session.res.write(initData);
+        if (session.res.flush) session.res.flush();
         break;
         
       case 'tools/list':
         console.log(`📨 Handling tools/list request: ${id}`);
         const toolsResult = {
-          tools: Object.values(tools)
+          jsonrpc: "2.0",
+          id: id,
+          result: {
+            tools: Object.values(tools)
+          }
         };
-        sendJsonRpcResponse(session.res, id, toolsResult);
+        
+        console.log('📤 Sending tools/list response via SSE:', JSON.stringify(toolsResult, null, 2));
+        const toolsData = `data: ${JSON.stringify(toolsResult)}\n\n`;
+        session.res.write(toolsData);
+        if (session.res.flush) session.res.flush();
         break;
         
       case 'tools/call':
@@ -338,30 +354,57 @@ app.post('/sse', (req, res) => {
         const { name, arguments: args } = params;
         
         if (!name || !tools[name]) {
-          sendJsonRpcResponse(session.res, id, null, {
-            code: -32601,
-            message: `Tool '${name}' not found`
-          });
+          const errorResult = {
+            jsonrpc: "2.0",
+            id: id,
+            error: {
+              code: -32601,
+              message: `Tool '${name}' not found`
+            }
+          };
+          
+          console.log('📤 Sending tools/call error via SSE:', JSON.stringify(errorResult, null, 2));
+          const errorData = `data: ${JSON.stringify(errorResult)}\n\n`;
+          session.res.write(errorData);
+          if (session.res.flush) session.res.flush();
           break;
         }
         
         // For now, return a placeholder response indicating OAuth is required
-        sendJsonRpcResponse(session.res, id, {
-          content: [
-            {
-              type: "text",
-              text: `Tool '${name}' requires OAuth authentication. Please authenticate with Google Drive to use this tool.`
-            }
-          ]
-        });
+        const callResult = {
+          jsonrpc: "2.0",
+          id: id,
+          result: {
+            content: [
+              {
+                type: "text",
+                text: `Tool '${name}' requires OAuth authentication. Please authenticate with Google Drive to use this tool.`
+              }
+            ]
+          }
+        };
+        
+        console.log('📤 Sending tools/call response via SSE:', JSON.stringify(callResult, null, 2));
+        const callData = `data: ${JSON.stringify(callResult)}\n\n`;
+        session.res.write(callData);
+        if (session.res.flush) session.res.flush();
         break;
         
       default:
         console.log(`📨 Unknown method: ${method}`);
-        sendJsonRpcResponse(session.res, id, null, {
-          code: -32601,
-          message: `Method '${method}' not found`
-        });
+        const unknownResult = {
+          jsonrpc: "2.0",
+          id: id,
+          error: {
+            code: -32601,
+            message: `Method '${method}' not found`
+          }
+        };
+        
+        console.log('📤 Sending unknown method error via SSE:', JSON.stringify(unknownResult, null, 2));
+        const unknownData = `data: ${JSON.stringify(unknownResult)}\n\n`;
+        session.res.write(unknownData);
+        if (session.res.flush) session.res.flush();
     }
     
     // Send success response to POST request
