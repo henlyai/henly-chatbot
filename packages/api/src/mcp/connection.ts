@@ -233,15 +233,18 @@ export class MCPConnection extends EventEmitter {
           logger.info(`${this.getLogPrefix()} SSEClientTransport created successfully`);
 
           transport.onmessage = (message) => {
+            console.log(`[DEBUG] MCP transport message received:`, message);
             logger.info(`${this.getLogPrefix()} Message received: ${JSON.stringify(message)}`);
           };
 
           transport.onclose = () => {
+            console.log(`[DEBUG] MCP transport closed`);
             logger.info(`${this.getLogPrefix()} SSE transport closed`);
             this.emit('connectionChange', 'disconnected');
           };
 
           transport.onerror = (error) => {
+            console.error(`[DEBUG] MCP transport error:`, error);
             logger.error(`${this.getLogPrefix()} SSE transport error:`, error);
             this.emitError(error, 'SSE transport error:');
           };
@@ -452,6 +455,14 @@ export class MCPConnection extends EventEmitter {
         this.emit('connectionChange', 'connected');
         this.reconnectAttempts = 0;
         logger.info(`${this.getLogPrefix()} Connection fully established`);
+        
+        // Add debugging to check client state
+        console.log(`[DEBUG] MCP client state after connection:`, {
+          connectionState: this.connectionState,
+          reconnectAttempts: this.reconnectAttempts,
+          isReconnecting: this.isReconnecting,
+          shouldStopReconnecting: this.shouldStopReconnecting
+        });
       } catch (error) {
         logger.error(`${this.getLogPrefix()} connectClient failed:`, error);
         
