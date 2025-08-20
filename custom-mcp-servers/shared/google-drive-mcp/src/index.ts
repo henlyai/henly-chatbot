@@ -241,13 +241,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Session management for active transports
+const activeTransports = new Map<string, SSEServerTransport>();
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    message: 'Google Drive MCP Server is running',
-    timestamp: new Date().toISOString(),
-    tools: tools.map(t => t.name)
+    server: 'google-drive-mcp',
+    ts: new Date().toISOString()
   });
 });
 
@@ -255,9 +257,8 @@ app.get('/health', (req, res) => {
 app.get('/test', (req, res) => {
   res.json({
     status: 'ok',
-    message: 'MCP server is running',
-    timestamp: new Date().toISOString(),
-    tools: tools.map(t => t.name)
+    server: 'google-drive-mcp',
+    ts: new Date().toISOString()
   });
 });
 
@@ -304,13 +305,26 @@ async function start() {
   // Set up SSE endpoint for MCP server
   app.get('/sse', async (req, res) => {
     try {
+      const sessionId = Array.isArray(req.headers['x-mcp-client']) 
+        ? req.headers['x-mcp-client'][0] 
+        : req.headers['x-mcp-client'] || 'default';
+      
       // Create SSE transport for this connection
       const transport = new SSEServerTransport('/sse', res);
+      
+      // Store the transport for this session
+      activeTransports.set(sessionId, transport);
       
       // Connect the server to this transport (this automatically calls start())
       await server.connect(transport);
       
-      console.log('✅ MCP server connected with SSE transport');
+      console.log(`✅ MCP server connected with SSE transport for session: ${sessionId}`);
+      
+      // Clean up when transport closes
+      transport.onclose = () => {
+        activeTransports.delete(sessionId);
+        console.log(`🗑️  Transport closed for session: ${sessionId}`);
+      };
     } catch (error) {
       console.error('❌ Error setting up SSE transport:', error);
       res.status(500).end();
@@ -320,8 +334,17 @@ async function start() {
   // Set up POST endpoint for receiving messages
   app.post('/sse', async (req, res) => {
     try {
-      // This will be handled by the transport when it receives messages
-      res.status(200).json({ status: 'ok' });
+      const sessionId = Array.isArray(req.headers['x-mcp-client']) 
+        ? req.headers['x-mcp-client'][0] 
+        : req.headers['x-mcp-client'] || 'default';
+      const transport = activeTransports.get(sessionId);
+      
+      if (!transport) {
+        return res.status(404).json({ error: 'No active transport found for session' });
+      }
+      
+      // Handle the POST message through the transport
+      await transport.handlePostMessage(req, res, req.body);
     } catch (error) {
       console.error('❌ Error handling POST request:', error);
       res.status(500).json({ error: 'Internal server error' });
