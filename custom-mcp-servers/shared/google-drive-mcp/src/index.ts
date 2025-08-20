@@ -301,14 +301,33 @@ app.post('/messages', async (req, res) => {
 async function start() {
   const port = process.env.PORT || 3001;
   
-  app.listen(port, () => {
-    console.log(`🚀 Google Drive MCP Server running on port ${port}`);
-    console.log(`🔗 Health check: http://localhost:${port}/health`);
-    console.log(`🧪 Test endpoint: http://localhost:${port}/test`);
-    console.log(`🔐 OAuth callback: http://localhost:${port}/oauth/callback`);
-    console.log(`📡 MCP endpoint: http://localhost:${port}/mcp`);
-    console.log(`📨 Messages endpoint: http://localhost:${port}/messages`);
-  });
+  try {
+    app.listen(port, () => {
+      console.log(`🚀 Google Drive MCP Server running on port ${port}`);
+      console.log(`🔗 Health check: http://localhost:${port}/health`);
+      console.log(`🧪 Test endpoint: http://localhost:${port}/test`);
+      console.log(`🔐 OAuth callback: http://localhost:${port}/oauth/callback`);
+      console.log(`📡 MCP endpoint: http://localhost:${port}/mcp`);
+      console.log(`📨 Messages endpoint: http://localhost:${port}/messages`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
 }
 
-start().catch(console.error); 
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 Received SIGTERM, shutting down gracefully...');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 Received SIGINT, shutting down gracefully...');
+  process.exit(0);
+});
+
+start().catch((error) => {
+  console.error('❌ Failed to start application:', error);
+  process.exit(1);
+}); 
