@@ -45,7 +45,10 @@ class OrganizationMCPService {
           url: server.endpoint,
           timeout: 60000,
           description: server.description,
-          capabilities: server.capabilities || []
+          capabilities: server.capabilities || [],
+          headers: {
+            'X-MCP-Client': organizationId // Use organization ID as session identifier
+          }
         };
 
         // Note: OAuth configuration removed for app-level connections
