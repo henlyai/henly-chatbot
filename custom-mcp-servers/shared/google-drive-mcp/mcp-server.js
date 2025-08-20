@@ -1,393 +1,400 @@
 import express from 'express';
+import cors from 'cors';
 
 const app = express();
+const PORT = process.env.PORT || 3001;
 
-// CORS middleware
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  console.log(`🌐 CORS request from origin: ${origin}`);
-  
-  // Allow requests from LibreChat domain
-  if (origin && (origin.includes('railway.app') || origin.includes('localhost'))) {
-    res.header('Access-Control-Allow-Origin', origin);
-    console.log(`✅ CORS allowed for origin: ${origin}`);
-  } else {
-    res.header('Access-Control-Allow-Origin', '*');
-    console.log(`🌍 CORS allowed for all origins (fallback)`);
-  }
-  
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  if (req.method === 'OPTIONS') {
-    console.log(`🔄 Handling OPTIONS preflight request`);
-    res.sendStatus(200);
-    return;
-  }
-  
-  next();
-});
+// Session management for SSE connections
+const sessions = new Map();
+const SESSION_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
-// Google Drive API tools
-const tools = {
-  "search_file": {
-    "name": "search_file",
-    "description": "Search for files in Google Drive by name, content, or metadata",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "query": {
-          "type": "string",
-          "description": "Search query (file name, content, or metadata)"
-        },
-        "fileType": {
-          "type": "string",
-          "description": "Optional file type filter (e.g., 'document', 'spreadsheet', 'presentation')"
-        },
-        "maxResults": {
-          "type": "number",
-          "description": "Maximum number of results to return (default: 10)"
-        }
-      },
-      "required": ["query"]
-    }
-  },
-  "find_document": {
-    "name": "find_document",
-    "description": "Find specific documents by name or ID",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "fileName": {
-          "type": "string",
-          "description": "Name of the document to find"
-        },
-        "fileId": {
-          "type": "string",
-          "description": "Google Drive file ID (if known)"
-        },
-        "exactMatch": {
-          "type": "boolean",
-          "description": "Whether to require exact name match (default: false)"
-        }
+// Clean up expired sessions
+setInterval(() => {
+  const now = Date.now();
+  for (const [sessionId, session] of sessions.entries()) {
+    if (now - session.lastActivity > SESSION_TIMEOUT) {
+      console.log(`🧹 Cleaning up expired session: ${sessionId}`);
+      if (session.res && !session.res.destroyed) {
+        session.res.end();
       }
-    }
-  },
-  "read_content": {
-    "name": "read_content",
-    "description": "Read the content of a Google Drive file",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "fileId": {
-          "type": "string",
-          "description": "Google Drive file ID"
-        },
-        "fileType": {
-          "type": "string",
-          "description": "Type of file (document, spreadsheet, text, etc.)"
-        },
-        "includeMetadata": {
-          "type": "boolean",
-          "description": "Whether to include file metadata (default: true)"
-        }
-      },
-      "required": ["fileId"]
-    }
-  },
-  "list_files": {
-    "name": "list_files",
-    "description": "List files and folders in Google Drive",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "folderId": {
-          "type": "string",
-          "description": "Folder ID to list contents from (default: root)"
-        },
-        "fileType": {
-          "type": "string",
-          "description": "Filter by file type"
-        },
-        "maxResults": {
-          "type": "number",
-          "description": "Maximum number of results (default: 50)"
-        },
-        "orderBy": {
-          "type": "string",
-          "description": "Sort order (modifiedTime, name, createdTime)"
-        }
-      }
-    }
-  },
-  "get_file_metadata": {
-    "name": "get_file_metadata",
-    "description": "Get detailed metadata for a Google Drive file",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "fileId": {
-          "type": "string",
-          "description": "Google Drive file ID"
-        }
-      },
-      "required": ["fileId"]
-    }
-  },
-  "download_file": {
-    "name": "download_file",
-    "description": "Download a file from Google Drive",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "fileId": {
-          "type": "string",
-          "description": "Google Drive file ID"
-        },
-        "format": {
-          "type": "string",
-          "description": "Export format for Google Docs (pdf, docx, txt, etc.)"
-        }
-      },
-      "required": ["fileId"]
-    }
-  },
-  "upload_file": {
-    "name": "upload_file",
-    "description": "Upload a file to Google Drive",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "fileName": {
-          "type": "string",
-          "description": "Name for the uploaded file"
-        },
-        "fileContent": {
-          "type": "string",
-          "description": "File content (base64 encoded)"
-        },
-        "mimeType": {
-          "type": "string",
-          "description": "MIME type of the file"
-        },
-        "parentFolderId": {
-          "type": "string",
-          "description": "Parent folder ID (default: root)"
-        }
-      },
-      "required": ["fileName", "fileContent"]
-    }
-  },
-  "create_folder": {
-    "name": "create_folder",
-    "description": "Create a new folder in Google Drive",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "folderName": {
-          "type": "string",
-          "description": "Name of the folder to create"
-        },
-        "parentFolderId": {
-          "type": "string",
-          "description": "Parent folder ID (default: root)"
-        },
-        "description": {
-          "type": "string",
-          "description": "Optional folder description"
-        }
-      },
-      "required": ["folderName"]
-    }
-  },
-  "delete_file": {
-    "name": "delete_file",
-    "description": "Delete a file or folder from Google Drive",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "fileId": {
-          "type": "string",
-          "description": "Google Drive file ID"
-        },
-        "permanent": {
-          "type": "boolean",
-          "description": "Whether to permanently delete (default: false, moves to trash)"
-        }
-      },
-      "required": ["fileId"]
-    }
-  },
-  "share_file": {
-    "name": "share_file",
-    "description": "Share a file with specific permissions",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "fileId": {
-          "type": "string",
-          "description": "Google Drive file ID"
-        },
-        "email": {
-          "type": "string",
-          "description": "Email address to share with"
-        },
-        "role": {
-          "type": "string",
-          "description": "Permission role (reader, writer, owner)",
-          "enum": ["reader", "writer", "owner"]
-        },
-        "type": {
-          "type": "string",
-          "description": "Permission type (user, group, domain, anyone)",
-          "enum": ["user", "group", "domain", "anyone"]
-        }
-      },
-      "required": ["fileId", "email", "role"]
-    }
-  },
-  "get_file_permissions": {
-    "name": "get_file_permissions",
-    "description": "Get current permissions for a file",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "fileId": {
-          "type": "string",
-          "description": "Google Drive file ID"
-        }
-      },
-      "required": ["fileId"]
-    }
-  },
-  "search_documents": {
-    "name": "search_documents",
-    "description": "Search specifically within Google Docs content",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "query": {
-          "type": "string",
-          "description": "Text to search for in document content"
-        },
-        "documentType": {
-          "type": "string",
-          "description": "Type of document (document, spreadsheet, presentation)"
-        },
-        "maxResults": {
-          "type": "number",
-          "description": "Maximum number of results (default: 10)"
-        }
-      },
-      "required": ["query"]
-    }
-  },
-  "read_document_content": {
-    "name": "read_document_content",
-    "description": "Read the full content of a Google Doc",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "fileId": {
-          "type": "string",
-          "description": "Google Drive file ID"
-        },
-        "includeFormatting": {
-          "type": "boolean",
-          "description": "Whether to include formatting information (default: false)"
-        }
-      },
-      "required": ["fileId"]
-    }
-  },
-  "extract_text": {
-    "name": "extract_text",
-    "description": "Extract text content from various file types",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "fileId": {
-          "type": "string",
-          "description": "Google Drive file ID"
-        },
-        "fileType": {
-          "type": "string",
-          "description": "Type of file (pdf, image, document, etc.)"
-        }
-      },
-      "required": ["fileId"]
-    }
-  },
-  "get_file_versions": {
-    "name": "get_file_versions",
-    "description": "Get version history of a file",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "fileId": {
-          "type": "string",
-          "description": "Google Drive file ID"
-        },
-        "maxVersions": {
-          "type": "number",
-          "description": "Maximum number of versions to return (default: 10)"
-        }
-      },
-      "required": ["fileId"]
+      sessions.delete(sessionId);
     }
   }
-};
+}, 30000); // Check every 30 seconds
 
-// Simple test endpoint
-app.get('/test', (req, res) => {
-  console.log('🧪 Test endpoint called');
-  res.json({ 
-    status: 'ok', 
-    message: 'MCP server is accessible',
-    timestamp: new Date().toISOString()
-  });
-});
+// CORS configuration
+const allowedOrigins = [
+  'https://scalewize-production-chatbot-production.up.railway.app',
+  'https://scalewize-website.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:3001'
+];
 
-// Log all requests
+app.use(cors({
+  origin: (origin, callback) => {
+    console.log(`🌐 CORS request from origin: ${origin}`);
+    if (!origin || allowedOrigins.includes(origin)) {
+      console.log(`✅ CORS allowed for origin: ${origin}`);
+      callback(null, true);
+    } else {
+      console.log(`❌ CORS blocked for origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
+app.use(express.json({ limit: '10mb' }));
+
+// Middleware to log all requests
 app.use((req, res, next) => {
   console.log(`📥 ${req.method} ${req.path} - Headers:`, req.headers);
   next();
 });
 
+// Google Drive MCP Tools
+const tools = {
+  search_file: {
+    name: "search_file",
+    description: "Search for files in Google Drive by name, content, or metadata",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search query for files"
+        },
+        fileType: {
+          type: "string",
+          description: "Optional file type filter (e.g., 'pdf', 'doc', 'image')"
+        }
+      },
+      required: ["query"]
+    }
+  },
+  find_document: {
+    name: "find_document",
+    description: "Find specific documents by title or ID",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Document title to search for"
+        },
+        fileId: {
+          type: "string",
+          description: "Specific file ID to retrieve"
+        }
+      }
+    }
+  },
+  read_content: {
+    name: "read_content",
+    description: "Read the content of a file from Google Drive",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: {
+          type: "string",
+          description: "Google Drive file ID"
+        },
+        format: {
+          type: "string",
+          description: "Content format (text, html, etc.)",
+          default: "text"
+        }
+      },
+      required: ["fileId"]
+    }
+  },
+  list_files: {
+    name: "list_files",
+    description: "List files and folders in Google Drive",
+    inputSchema: {
+      type: "object",
+      properties: {
+        folderId: {
+          type: "string",
+          description: "Folder ID to list contents (default: root)"
+        },
+        pageSize: {
+          type: "number",
+          description: "Number of items per page",
+          default: 50
+        }
+      }
+    }
+  },
+  get_file_metadata: {
+    name: "get_file_metadata",
+    description: "Get detailed metadata for a file",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: {
+          type: "string",
+          description: "Google Drive file ID"
+        }
+      },
+      required: ["fileId"]
+    }
+  },
+  download_file: {
+    name: "download_file",
+    description: "Download a file from Google Drive",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: {
+          type: "string",
+          description: "Google Drive file ID"
+        },
+        format: {
+          type: "string",
+          description: "Download format",
+          default: "original"
+        }
+      },
+      required: ["fileId"]
+    }
+  },
+  upload_file: {
+    name: "upload_file",
+    description: "Upload a file to Google Drive",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileName: {
+          type: "string",
+          description: "Name for the uploaded file"
+        },
+        content: {
+          type: "string",
+          description: "File content (base64 encoded for binary files)"
+        },
+        mimeType: {
+          type: "string",
+          description: "MIME type of the file"
+        },
+        parentFolderId: {
+          type: "string",
+          description: "Parent folder ID (default: root)"
+        }
+      },
+      required: ["fileName", "content"]
+    }
+  },
+  create_folder: {
+    name: "create_folder",
+    description: "Create a new folder in Google Drive",
+    inputSchema: {
+      type: "object",
+      properties: {
+        folderName: {
+          type: "string",
+          description: "Name for the new folder"
+        },
+        parentFolderId: {
+          type: "string",
+          description: "Parent folder ID (default: root)"
+        }
+      },
+      required: ["folderName"]
+    }
+  },
+  delete_file: {
+    name: "delete_file",
+    description: "Delete a file or folder from Google Drive",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: {
+          type: "string",
+          description: "Google Drive file ID to delete"
+        }
+      },
+      required: ["fileId"]
+    }
+  },
+  share_file: {
+    name: "share_file",
+    description: "Share a file with specific users or make it publicly accessible",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: {
+          type: "string",
+          description: "Google Drive file ID"
+        },
+        email: {
+          type: "string",
+          description: "Email address to share with"
+        },
+        role: {
+          type: "string",
+          description: "Permission role (reader, writer, owner)",
+          default: "reader"
+        },
+        type: {
+          type: "string",
+          description: "Permission type (user, group, domain, anyone)",
+          default: "user"
+        }
+      },
+      required: ["fileId"]
+    }
+  },
+  get_file_permissions: {
+    name: "get_file_permissions",
+    description: "Get current permissions for a file",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: {
+          type: "string",
+          description: "Google Drive file ID"
+        }
+      },
+      required: ["fileId"]
+    }
+  },
+  search_documents: {
+    name: "search_documents",
+    description: "Search for Google Docs, Sheets, and Slides",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Search query for documents"
+        },
+        documentType: {
+          type: "string",
+          description: "Document type (document, spreadsheet, presentation)",
+          enum: ["document", "spreadsheet", "presentation"]
+        }
+      },
+      required: ["query"]
+    }
+  },
+  read_document_content: {
+    name: "read_document_content",
+    description: "Read content from Google Docs, Sheets, or Slides",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: {
+          type: "string",
+          description: "Google Drive file ID"
+        },
+        exportFormat: {
+          type: "string",
+          description: "Export format (pdf, docx, txt, etc.)",
+          default: "txt"
+        }
+      },
+      required: ["fileId"]
+    }
+  },
+  extract_text: {
+    name: "extract_text",
+    description: "Extract text content from various file types",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: {
+          type: "string",
+          description: "Google Drive file ID"
+        }
+      },
+      required: ["fileId"]
+    }
+  },
+  get_file_versions: {
+    name: "get_file_versions",
+    description: "Get version history for a file",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fileId: {
+          type: "string",
+          description: "Google Drive file ID"
+        }
+      },
+      required: ["fileId"]
+    }
+  }
+};
+
+// Helper function to send JSON-RPC response
+function sendJsonRpcResponse(res, id, result, error = null) {
+  const response = {
+    jsonrpc: "2.0",
+    id: id
+  };
+  
+  if (error) {
+    response.error = error;
+  } else {
+    response.result = result;
+  }
+  
+  const data = `data: ${JSON.stringify(response)}\n\n`;
+  console.log(`📤 Sending JSON-RPC response:`, JSON.stringify(response, null, 2));
+  res.write(data);
+}
+
+// Helper function to send JSON-RPC notification
+function sendJsonRpcNotification(res, method, params = {}) {
+  const notification = {
+    jsonrpc: "2.0",
+    method: method,
+    params: params
+  };
+  
+  const data = `data: ${JSON.stringify(notification)}\n\n`;
+  console.log(`📤 Sending JSON-RPC notification:`, JSON.stringify(notification, null, 2));
+  res.write(data);
+}
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   console.log('🏥 Health check request received');
-  console.log('🏥 Request headers:', req.headers);
-  
-  const healthResponse = {
-    status: 'healthy',
-    service: 'Google Drive MCP Server',
-    version: '2.0.0',
-    timestamp: new Date().toISOString(),
-    tools: Object.keys(tools).length,
-    tools_list: Object.keys(tools)
-  };
-  
-  console.log('🏥 Sending health response:', healthResponse);
-  res.json(healthResponse);
-  console.log('🏥 Health check response sent');
+  res.status(200).send('OK');
 });
 
-// SSE endpoint for MCP protocol
+// Test endpoint
+app.get('/test', (req, res) => {
+  console.log('🧪 Test endpoint request received');
+  res.json({
+    status: 'ok',
+    message: 'MCP server is running',
+    timestamp: new Date().toISOString(),
+    tools: Object.keys(tools)
+  });
+});
+
+// SSE endpoint for server→client communication
 app.get('/sse', (req, res) => {
   console.log('🔗 SSE connection request received');
   console.log('🔗 Request headers:', req.headers);
   console.log('🔗 Request method:', req.method);
   console.log('🔗 Request URL:', req.url);
   
+  // Extract session identifier from headers or query params
+  const sessionId = req.headers['x-mcp-client'] || req.query.sessionId || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  console.log(`🔗 Session ID: ${sessionId}`);
+  
   // Set SSE headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
+    'Cache-Control': 'no-cache, no-transform',
     'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Cache-Control'
+    'Access-Control-Allow-Headers': 'Cache-Control, X-MCP-Client'
   });
 
   console.log('🔗 SSE headers set, sending initial keep-alive');
@@ -396,109 +403,195 @@ app.get('/sse', (req, res) => {
   res.write(':\n\n');
   console.log('🔗 Initial keep-alive sent');
 
-  // Send initialization message immediately (LibreChat expects this)
-  const initMessage = {
-    jsonrpc: "2.0",
-    id: 1,
-    result: {
-      protocolVersion: "2024-11-05",
-      capabilities: {
-        tools: tools,
-        resources: {}
-      },
-      serverInfo: {
-        name: "Google Drive MCP Server",
-        version: "2.0.0"
-      }
-    }
+  // Store session
+  const session = {
+    res: res,
+    sessionId: sessionId,
+    lastActivity: Date.now(),
+    connected: true
   };
-
-  console.log('📤 Sending initialization message immediately with', Object.keys(tools).length, 'tools');
-  console.log('📤 Message ID:', initMessage.id);
-  console.log('📤 Tools included:', Object.keys(tools));
   
-  const responseData = `data: ${JSON.stringify(initMessage)}\n\n`;
-  console.log('📤 Writing initialization data immediately');
-  res.write(responseData);
-  console.log('📤 Initialization message sent successfully');
-
-  let messageCount = 0;
-
-  // Handle incoming messages from client (for future requests)
-  req.on('data', (chunk) => {
-    messageCount++;
-    console.log(`📨 Received data chunk #${messageCount}:`, chunk.toString());
-    console.log(`📨 Chunk length: ${chunk.length} bytes`);
-    console.log(`📨 Chunk encoding: ${chunk.encoding || 'undefined'}`);
-    
-    try {
-      const message = JSON.parse(chunk.toString());
-      console.log(`📨 Parsed message #${messageCount}:`, JSON.stringify(message, null, 2));
-      console.log(`📨 Message method: ${message.method || 'undefined'}`);
-      console.log(`📨 Message ID: ${message.id || 'undefined'}`);
-      console.log(`📨 Message params:`, message.params || 'undefined');
-      
-      if (message.method) {
-        console.log(`📨 Received method call: ${message.method}`);
-        console.log(`📨 Method params:`, message.params || 'undefined');
-        // Handle other method calls here (tools/call, etc.)
-      } else {
-        console.log('📨 Received message without method:', message);
-      }
-    } catch (error) {
-      console.error('❌ Error parsing client message:', error);
-      console.error('❌ Raw chunk:', chunk.toString());
-      console.error('❌ Chunk type:', typeof chunk);
-      console.error('❌ Chunk buffer:', chunk);
-    }
-  });
+  sessions.set(sessionId, session);
+  console.log(`🔗 Session stored: ${sessionId}`);
+  console.log(`🔗 Active sessions: ${sessions.size}`);
 
   // Keep connection alive
   const interval = setInterval(() => {
-    console.log('💓 Sending keep-alive ping');
-    res.write(':\n\n'); // Keep-alive comment
+    if (session.connected && !res.destroyed) {
+      console.log(`💓 Sending keep-alive ping for session: ${sessionId}`);
+      res.write(':\n\n');
+      session.lastActivity = Date.now();
+    } else {
+      console.log(`💔 Session ${sessionId} disconnected, stopping keep-alive`);
+      clearInterval(interval);
+    }
   }, 30000);
 
+  // Handle connection close
   req.on('close', () => {
-    console.log('🔌 SSE connection closed by client');
-    console.log('📊 Connection stats - Messages received:', messageCount);
+    console.log(`🔌 SSE connection closed for session: ${sessionId}`);
+    session.connected = false;
     clearInterval(interval);
+    sessions.delete(sessionId);
+    console.log(`🔗 Session removed: ${sessionId}`);
+    console.log(`🔗 Active sessions: ${sessions.size}`);
   });
 
   req.on('error', (error) => {
-    console.error('💥 SSE connection error:', error);
-    console.error('💥 Error code:', error.code);
-    console.error('💥 Error message:', error.message);
+    console.error(`💥 SSE connection error for session ${sessionId}:`, error);
+    session.connected = false;
     clearInterval(interval);
+    sessions.delete(sessionId);
   });
 
   req.on('end', () => {
-    console.log('🏁 SSE connection ended');
+    console.log(`🏁 SSE connection ended for session: ${sessionId}`);
   });
 });
 
-// OAuth callback endpoint
-app.get('/oauth/callback', (req, res) => {
-  const { code, state } = req.query;
+// POST endpoint for client→server communication
+app.post('/sse', (req, res) => {
+  console.log('📨 POST /sse request received');
+  console.log('📨 Request headers:', req.headers);
+  console.log('📨 Request body:', JSON.stringify(req.body, null, 2));
   
-  if (!code) {
-    return res.status(400).json({ error: 'Authorization code not provided' });
+  try {
+    const { id, method, params } = req.body;
+    
+    if (!id || !method) {
+      console.error('❌ Invalid JSON-RPC request: missing id or method');
+      return res.status(400).json({
+        jsonrpc: "2.0",
+        id: null,
+        error: {
+          code: -32600,
+          message: "Invalid Request"
+        }
+      });
+    }
+    
+    console.log(`📨 Processing JSON-RPC request: id=${id}, method=${method}`);
+    
+    // Extract session identifier
+    const sessionId = req.headers['x-mcp-client'] || req.query.sessionId;
+    
+    if (!sessionId) {
+      console.error('❌ No session ID provided in headers or query params');
+      return res.status(400).json({
+        jsonrpc: "2.0",
+        id: id,
+        error: {
+          code: -32001,
+          message: "Session not found"
+        }
+      });
+    }
+    
+    console.log(`📨 Session ID: ${sessionId}`);
+    
+    // Find the corresponding SSE session
+    const session = sessions.get(sessionId);
+    
+    if (!session || !session.connected) {
+      console.error(`❌ Session not found or disconnected: ${sessionId}`);
+      return res.status(400).json({
+        jsonrpc: "2.0",
+        id: id,
+        error: {
+          code: -32001,
+          message: "Session not found or disconnected"
+        }
+      });
+    }
+    
+    // Update last activity
+    session.lastActivity = Date.now();
+    
+    // Handle different methods
+    switch (method) {
+      case 'initialize':
+        console.log(`📨 Handling initialize request: ${id}`);
+        const initResult = {
+          protocolVersion: "2024-11-05",
+          capabilities: {
+            tools: {},
+            resources: {}
+          },
+          serverInfo: {
+            name: "Google Drive MCP Server",
+            version: "2.0.0"
+          }
+        };
+        sendJsonRpcResponse(session.res, id, initResult);
+        break;
+        
+      case 'tools/list':
+        console.log(`📨 Handling tools/list request: ${id}`);
+        const toolsResult = {
+          tools: Object.values(tools)
+        };
+        sendJsonRpcResponse(session.res, id, toolsResult);
+        break;
+        
+      case 'tools/call':
+        console.log(`📨 Handling tools/call request: ${id}`);
+        const { name, arguments: args } = params;
+        
+        if (!name || !tools[name]) {
+          sendJsonRpcResponse(session.res, id, null, {
+            code: -32601,
+            message: `Tool '${name}' not found`
+          });
+          break;
+        }
+        
+        // For now, return a placeholder response indicating OAuth is required
+        // In a real implementation, this would handle the actual Google Drive API calls
+        sendJsonRpcResponse(session.res, id, {
+          content: [
+            {
+              type: "text",
+              text: `Tool '${name}' requires OAuth authentication. Please authenticate with Google Drive to use this tool.`
+            }
+          ]
+        });
+        break;
+        
+      default:
+        console.log(`📨 Unknown method: ${method}`);
+        sendJsonRpcResponse(session.res, id, null, {
+          code: -32601,
+          message: `Method '${method}' not found`
+        });
+    }
+    
+    // Send success response to POST request
+    res.status(200).json({
+      jsonrpc: "2.0",
+      id: id,
+      result: { status: "processed" }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error processing POST /sse request:', error);
+    res.status(500).json({
+      jsonrpc: "2.0",
+      id: req.body?.id || null,
+      error: {
+        code: -32603,
+        message: "Internal error"
+      }
+    });
   }
-
-  // Handle OAuth callback
-  console.log('OAuth callback received:', { code, state });
-  
-  // TODO: Exchange code for tokens
-  res.json({ 
-    status: 'success', 
-    message: 'OAuth callback received. Token exchange would happen here.' 
-  });
 });
 
-const port = process.env.PORT || 3001;
-app.listen(port, () => {
-  console.log(`🚀 Google Drive MCP Server v2.0.0 running on port ${port}`);
-  console.log(`📊 Health check: http://localhost:${port}/health`);
-  console.log(`📡 SSE endpoint: http://localhost:${port}/sse`);
-  console.log(`🔧 Available tools: ${Object.keys(tools).join(', ')}`);
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 MCP Server running on port ${PORT}`);
+  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+  console.log(`🧪 Test endpoint: http://localhost:${PORT}/test`);
+  console.log(`📡 SSE endpoint: http://localhost:${PORT}/sse`);
+  console.log(`📨 POST endpoint: http://localhost:${PORT}/sse`);
+  console.log(`🛠️  Available tools: ${Object.keys(tools).length}`);
+  console.log(`📋 Tools: ${Object.keys(tools).join(', ')}`);
 }); 
