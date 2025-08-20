@@ -233,6 +233,19 @@ app.get('/oauth/callback', async (req, res) => {
 app.get('/mcp', async (req, res) => {
   console.log('📡 Received GET request to /mcp (establishing SSE stream)');
   try {
+    // Set SSE headers
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Cache-Control',
+      'X-Accel-Buffering': 'no'
+    });
+
+    // Send initial keep-alive
+    res.write(':\n\n');
+
     // Create a new SSE transport for the client
     const transport = new SSEServerTransport('/messages', res);
     
@@ -250,6 +263,22 @@ app.get('/mcp', async (req, res) => {
     await server.connect(transport);
     
     console.log(`✅ Established SSE stream with session ID: ${sessionId}`);
+    
+    // Send a keep-alive every 30 seconds to maintain connection
+    const keepAliveInterval = setInterval(() => {
+      if (!res.destroyed) {
+        res.write(':\n\n');
+      } else {
+        clearInterval(keepAliveInterval);
+      }
+    }, 30000);
+
+    // Clean up interval when connection closes
+    req.on('close', () => {
+      clearInterval(keepAliveInterval);
+      console.log(`🔌 Client disconnected for session ${sessionId}`);
+    });
+    
   } catch (error) {
     console.error('❌ Error establishing SSE stream:', error);
     if (!res.headersSent) {
