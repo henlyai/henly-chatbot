@@ -307,11 +307,8 @@ async function start() {
       // Create SSE transport for this connection
       const transport = new SSEServerTransport('/sse', res);
       
-      // Connect the server to this transport
+      // Connect the server to this transport (this automatically calls start())
       await server.connect(transport);
-      
-      // Start the SSE connection
-      await transport.start();
       
       console.log('✅ MCP server connected with SSE transport');
     } catch (error) {
