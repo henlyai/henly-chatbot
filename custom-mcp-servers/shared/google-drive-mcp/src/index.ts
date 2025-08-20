@@ -2,22 +2,27 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { z } from 'zod';
 import { google } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
+import { GoogleAuth } from 'google-auth-library';
 import express from 'express';
 import cors from 'cors';
+import crypto from 'crypto';
 
 console.log('🚀 Starting Google Drive MCP Server...');
 
-// Initialize Google APIs
-console.log('📡 Initializing Google OAuth client...');
-const oauth2Client = new OAuth2Client(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/oauth/callback'
-);
+// Supabase client for fetching organization configurations
+let supabase: any;
 
-const drive = google.drive({ version: 'v3', auth: oauth2Client });
-console.log('✅ Google APIs initialized');
+async function initializeSupabase() {
+  const { createClient } = await import('@supabase/supabase-js');
+  supabase = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_ANON_KEY!
+  );
+  console.log('✅ Supabase client initialized');
+}
+
+// Encryption key for decrypting service account keys
+const ENCRYPTION_KEY = process.env.MCP_ENCRYPTION_KEY || 'your-encryption-key-32-chars-long!';
 
 // Create a single MCP server instance
 console.log('🔧 Creating MCP server instance...');
@@ -33,14 +38,87 @@ const server = new McpServer(
   }
 );
 
+// Helper function to decrypt service account key
+function decryptServiceAccountKey(encryptedKey: string): string {
+  const [ivHex, encrypted] = encryptedKey.split(':');
+  const iv = Buffer.from(ivHex, 'hex');
+  
+  const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  
+  return decrypted;
+}
+
+// Helper function to get organization-specific Google Drive client
+async function getOrganizationDriveClient(organizationId: string) {
+  try {
+    console.log(`🔍 Fetching MCP config for organization: ${organizationId}`);
+    
+    // Get MCP server configuration from Supabase
+    const { data: mcpServer, error } = await supabase
+      .from('mcp_servers')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .eq('name', 'Google Drive')
+      .eq('is_active', true)
+      .single();
+
+    if (error || !mcpServer) {
+      throw new Error(`Google Drive not configured for organization ${organizationId}`);
+    }
+
+    if (mcpServer.auth_type !== 'service_account') {
+      throw new Error(`Google Drive authentication not set up for organization ${organizationId}`);
+    }
+
+    // Decrypt service account key
+    const serviceAccountKey = decryptServiceAccountKey(
+      mcpServer.auth_config.service_account_key
+    );
+    
+    const credentials = JSON.parse(serviceAccountKey);
+    const auth = new GoogleAuth({ credentials });
+    
+    return {
+      drive: google.drive({ version: 'v3', auth }),
+      folderId: mcpServer.google_drive_folder_id || 'root',
+      organizationName: mcpServer.organization_id
+    };
+  } catch (error) {
+    console.error(`❌ Error getting organization drive client: ${error}`);
+    throw error;
+  }
+}
+
+// Helper function to extract organization ID from request context
+function getOrganizationIdFromContext(context: any): string {
+  // Try to get from headers first (LibreChat sends this)
+  const orgId = context?.headers?.['x-mcp-client'] || 
+                context?.headers?.['X-MCP-Client'] ||
+                context?.organizationId;
+  
+  if (!orgId) {
+    throw new Error('Organization ID not found in request context. Please ensure the MCP client is properly configured.');
+  }
+  
+  return orgId;
+}
+
 // Define tools using the official pattern
 console.log('🛠️  Registering MCP tools...');
+
 server.tool('search_file', 'Search for files in Google Drive by name, content, or metadata', {
   query: z.string().describe('Search query for files'),
   fileType: z.string().optional().describe('Optional file type filter (e.g., "pdf", "doc", "image")')
-}, async ({ query, fileType }) => {
+}, async ({ query, fileType }, context) => {
   try {
-    let searchQuery = `fullText contains '${query}'`;
+    const organizationId = getOrganizationIdFromContext(context);
+    console.log(`🔍 Searching files for organization: ${organizationId}`);
+    
+    const { drive, folderId } = await getOrganizationDriveClient(organizationId);
+    
+    let searchQuery = `'${folderId}' in parents and fullText contains '${query}'`;
     if (fileType) {
       searchQuery += ` and mimeType contains '${fileType}'`;
     }
@@ -55,7 +133,7 @@ server.tool('search_file', 'Search for files in Google Drive by name, content, o
       content: [
         {
           type: 'text',
-          text: `Found ${response.data.files?.length || 0} files matching "${query}":\n\n${
+          text: `Found ${response.data.files?.length || 0} files matching "${query}" in your Google Drive:\n\n${
             response.data.files?.map(file => 
               `- ${file.name} (${file.id}) - ${file.mimeType}`
             ).join('\n') || 'No files found'
@@ -64,6 +142,7 @@ server.tool('search_file', 'Search for files in Google Drive by name, content, o
       ]
     };
   } catch (error) {
+    console.error(`❌ Error in search_file: ${error}`);
     return {
       content: [
         {
@@ -76,12 +155,20 @@ server.tool('search_file', 'Search for files in Google Drive by name, content, o
 });
 
 server.tool('list_files', 'List files and folders in Google Drive', {
-  folderId: z.string().optional().describe('Folder ID to list contents (default: root)'),
+  folderId: z.string().optional().describe('Folder ID to list contents (default: organization folder)'),
   pageSize: z.number().optional().describe('Number of items per page').default(50)
-}, async ({ folderId = 'root', pageSize = 50 }) => {
+}, async ({ folderId, pageSize = 50 }, context) => {
   try {
+    const organizationId = getOrganizationIdFromContext(context);
+    console.log(`📁 Listing files for organization: ${organizationId}`);
+    
+    const { drive, folderId: orgFolderId } = await getOrganizationDriveClient(organizationId);
+    
+    // Use provided folderId or default to organization folder
+    const targetFolderId = folderId || orgFolderId;
+
     const response = await drive.files.list({
-      q: `'${folderId}' in parents and trashed=false`,
+      q: `'${targetFolderId}' in parents and trashed=false`,
       fields: 'files(id,name,mimeType,size,modifiedTime)',
       pageSize
     });
@@ -90,7 +177,7 @@ server.tool('list_files', 'List files and folders in Google Drive', {
       content: [
         {
           type: 'text',
-          text: `Files in folder ${folderId}:\n\n${
+          text: `Files in your Google Drive folder:\n\n${
             response.data.files?.map(file => 
               `- ${file.name} (${file.id}) - ${file.mimeType}`
             ).join('\n') || 'No files found'
@@ -99,6 +186,7 @@ server.tool('list_files', 'List files and folders in Google Drive', {
       ]
     };
   } catch (error) {
+    console.error(`❌ Error in list_files: ${error}`);
     return {
       content: [
         {
@@ -112,8 +200,13 @@ server.tool('list_files', 'List files and folders in Google Drive', {
 
 server.tool('get_file_metadata', 'Get detailed metadata for a file', {
   fileId: z.string().describe('Google Drive file ID')
-}, async ({ fileId }) => {
+}, async ({ fileId }, context) => {
   try {
+    const organizationId = getOrganizationIdFromContext(context);
+    console.log(`📄 Getting metadata for file ${fileId} in organization: ${organizationId}`);
+    
+    const { drive } = await getOrganizationDriveClient(organizationId);
+
     const response = await drive.files.get({
       fileId,
       fields: 'id,name,mimeType,size,modifiedTime,createdTime,parents,webViewLink'
@@ -134,6 +227,7 @@ server.tool('get_file_metadata', 'Get detailed metadata for a file', {
       ]
     };
   } catch (error) {
+    console.error(`❌ Error in get_file_metadata: ${error}`);
     return {
       content: [
         {
@@ -148,8 +242,13 @@ server.tool('get_file_metadata', 'Get detailed metadata for a file', {
 server.tool('read_content', 'Read the content of a file from Google Drive', {
   fileId: z.string().describe('Google Drive file ID'),
   format: z.string().optional().describe('Content format (text, html, etc.)').default('text')
-}, async ({ fileId, format = 'text' }) => {
+}, async ({ fileId, format = 'text' }, context) => {
   try {
+    const organizationId = getOrganizationIdFromContext(context);
+    console.log(`📖 Reading content for file ${fileId} in organization: ${organizationId}`);
+    
+    const { drive } = await getOrganizationDriveClient(organizationId);
+
     const response = await drive.files.get({
       fileId,
       alt: 'media'
@@ -164,6 +263,7 @@ server.tool('read_content', 'Read the content of a file from Google Drive', {
       ]
     };
   } catch (error) {
+    console.error(`❌ Error in read_content: ${error}`);
     return {
       content: [
         {
@@ -191,7 +291,9 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    service: 'google-drive-mcp-server'
+    service: 'google-drive-mcp-server',
+    version: '2.0.0',
+    auth_type: 'organization-based'
   });
 });
 
@@ -200,30 +302,44 @@ app.get('/test', (req, res) => {
   res.json({ 
     message: 'Google Drive MCP Server is running!',
     tools: ['search_file', 'list_files', 'get_file_metadata', 'read_content'],
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    auth_type: 'organization-based',
+    organization_id_source: 'X-MCP-Client header (automatically provided by LibreChat)',
+    note: 'Organization ID is automatically extracted from request headers'
   });
 });
 
-// OAuth callback endpoint
-app.get('/oauth/callback', async (req, res) => {
-  const { code } = req.query;
-  
-  if (!code || typeof code !== 'string') {
-    return res.status(400).json({ error: 'Authorization code required' });
-  }
-
+// Organization configuration endpoint
+app.get('/config/:organizationId', async (req, res) => {
   try {
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
+    const { organizationId } = req.params;
     
+    const { data: mcpServer, error } = await supabase
+      .from('mcp_servers')
+      .select('name, auth_type, google_drive_folder_id, is_active')
+      .eq('organization_id', organizationId)
+      .eq('name', 'Google Drive')
+      .eq('is_active', true)
+      .single();
+
+    if (error || !mcpServer) {
+      return res.status(404).json({
+        error: 'Google Drive not configured for this organization',
+        organizationId
+      });
+    }
+
     res.json({
-      status: 'success',
-      message: 'OAuth authentication successful'
+      organizationId,
+      configured: true,
+      auth_type: mcpServer.auth_type,
+      folder_id: mcpServer.google_drive_folder_id,
+      is_active: mcpServer.is_active
     });
   } catch (error) {
-    console.error('OAuth error:', error);
+    console.error('Error checking organization config:', error);
     res.status(500).json({
-      error: 'OAuth authentication failed',
+      error: 'Failed to check organization configuration',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
@@ -312,14 +428,17 @@ async function start() {
   
   console.log(`🚀 Starting server on port ${port}...`);
   
+  // Initialize Supabase client
+  await initializeSupabase();
+  
   try {
     app.listen(port, () => {
       console.log(`🎉 Google Drive MCP Server running on port ${port}`);
       console.log(`🔗 Health check: http://localhost:${port}/health`);
       console.log(`🧪 Test endpoint: http://localhost:${port}/test`);
-      console.log(`🔐 OAuth callback: http://localhost:${port}/oauth/callback`);
       console.log(`📡 MCP endpoint: http://localhost:${port}/mcp`);
       console.log(`📨 Messages endpoint: http://localhost:${port}/messages`);
+      console.log(`🔐 Auth type: Organization-based service account`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
