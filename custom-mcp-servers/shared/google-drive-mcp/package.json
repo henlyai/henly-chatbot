@@ -8,7 +8,7 @@
     "build": "echo 'No build step needed for JavaScript'",
     "start": "node mcp-server.js",
     "dev": "node mcp-server.js",
-    "test": "node test-server.js",
+    "test": "node test-bidirectional-mcp.js",
     "simple": "node mcp-server.js",
     "watch": "node mcp-server.js"
   },

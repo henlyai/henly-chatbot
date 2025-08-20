@@ -72,42 +72,6 @@ const tools = {
       required: ["query"]
     }
   },
-  find_document: {
-    name: "find_document",
-    description: "Find specific documents by title or ID",
-    inputSchema: {
-      type: "object",
-      properties: {
-        title: {
-          type: "string",
-          description: "Document title to search for"
-        },
-        fileId: {
-          type: "string",
-          description: "Specific file ID to retrieve"
-        }
-      }
-    }
-  },
-  read_content: {
-    name: "read_content",
-    description: "Read the content of a file from Google Drive",
-    inputSchema: {
-      type: "object",
-      properties: {
-        fileId: {
-          type: "string",
-          description: "Google Drive file ID"
-        },
-        format: {
-          type: "string",
-          description: "Content format (text, html, etc.)",
-          default: "text"
-        }
-      },
-      required: ["fileId"]
-    }
-  },
   list_files: {
     name: "list_files",
     description: "List files and folders in Google Drive",
@@ -140,9 +104,9 @@ const tools = {
       required: ["fileId"]
     }
   },
-  download_file: {
-    name: "download_file",
-    description: "Download a file from Google Drive",
+  read_content: {
+    name: "read_content",
+    description: "Read the content of a file from Google Drive",
     inputSchema: {
       type: "object",
       properties: {
@@ -152,174 +116,8 @@ const tools = {
         },
         format: {
           type: "string",
-          description: "Download format",
-          default: "original"
-        }
-      },
-      required: ["fileId"]
-    }
-  },
-  upload_file: {
-    name: "upload_file",
-    description: "Upload a file to Google Drive",
-    inputSchema: {
-      type: "object",
-      properties: {
-        fileName: {
-          type: "string",
-          description: "Name for the uploaded file"
-        },
-        content: {
-          type: "string",
-          description: "File content (base64 encoded for binary files)"
-        },
-        mimeType: {
-          type: "string",
-          description: "MIME type of the file"
-        },
-        parentFolderId: {
-          type: "string",
-          description: "Parent folder ID (default: root)"
-        }
-      },
-      required: ["fileName", "content"]
-    }
-  },
-  create_folder: {
-    name: "create_folder",
-    description: "Create a new folder in Google Drive",
-    inputSchema: {
-      type: "object",
-      properties: {
-        folderName: {
-          type: "string",
-          description: "Name for the new folder"
-        },
-        parentFolderId: {
-          type: "string",
-          description: "Parent folder ID (default: root)"
-        }
-      },
-      required: ["folderName"]
-    }
-  },
-  delete_file: {
-    name: "delete_file",
-    description: "Delete a file or folder from Google Drive",
-    inputSchema: {
-      type: "object",
-      properties: {
-        fileId: {
-          type: "string",
-          description: "Google Drive file ID to delete"
-        }
-      },
-      required: ["fileId"]
-    }
-  },
-  share_file: {
-    name: "share_file",
-    description: "Share a file with specific users or make it publicly accessible",
-    inputSchema: {
-      type: "object",
-      properties: {
-        fileId: {
-          type: "string",
-          description: "Google Drive file ID"
-        },
-        email: {
-          type: "string",
-          description: "Email address to share with"
-        },
-        role: {
-          type: "string",
-          description: "Permission role (reader, writer, owner)",
-          default: "reader"
-        },
-        type: {
-          type: "string",
-          description: "Permission type (user, group, domain, anyone)",
-          default: "user"
-        }
-      },
-      required: ["fileId"]
-    }
-  },
-  get_file_permissions: {
-    name: "get_file_permissions",
-    description: "Get current permissions for a file",
-    inputSchema: {
-      type: "object",
-      properties: {
-        fileId: {
-          type: "string",
-          description: "Google Drive file ID"
-        }
-      },
-      required: ["fileId"]
-    }
-  },
-  search_documents: {
-    name: "search_documents",
-    description: "Search for Google Docs, Sheets, and Slides",
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "Search query for documents"
-        },
-        documentType: {
-          type: "string",
-          description: "Document type (document, spreadsheet, presentation)",
-          enum: ["document", "spreadsheet", "presentation"]
-        }
-      },
-      required: ["query"]
-    }
-  },
-  read_document_content: {
-    name: "read_document_content",
-    description: "Read content from Google Docs, Sheets, or Slides",
-    inputSchema: {
-      type: "object",
-      properties: {
-        fileId: {
-          type: "string",
-          description: "Google Drive file ID"
-        },
-        exportFormat: {
-          type: "string",
-          description: "Export format (pdf, docx, txt, etc.)",
-          default: "txt"
-        }
-      },
-      required: ["fileId"]
-    }
-  },
-  extract_text: {
-    name: "extract_text",
-    description: "Extract text content from various file types",
-    inputSchema: {
-      type: "object",
-      properties: {
-        fileId: {
-          type: "string",
-          description: "Google Drive file ID"
-        }
-      },
-      required: ["fileId"]
-    }
-  },
-  get_file_versions: {
-    name: "get_file_versions",
-    description: "Get version history for a file",
-    inputSchema: {
-      type: "object",
-      properties: {
-        fileId: {
-          type: "string",
-          description: "Google Drive file ID"
+          description: "Content format (text, html, etc.)",
+          default: "text"
         }
       },
       required: ["fileId"]
@@ -361,7 +159,12 @@ function sendJsonRpcNotification(res, method, params = {}) {
 // Health check endpoint
 app.get('/health', (req, res) => {
   console.log('🏥 Health check request received');
-  res.status(200).send('OK');
+  res.status(200).json({
+    status: 'ok',
+    server: 'Google Drive MCP Server',
+    version: '2.0.0',
+    tools: Object.keys(tools)
+  });
 });
 
 // Test endpoint

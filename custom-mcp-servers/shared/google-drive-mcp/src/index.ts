@@ -1,5 +1,4 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
@@ -17,13 +16,13 @@ class GoogleDriveMCPServer {
   constructor() {
     this.server = new Server({
       name: 'google-drive-mcp-server',
-      version: '1.0.0'
+      version: '2.0.0'
     });
 
     this.oauth2Client = new OAuth2Client(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
+      process.env.GOOGLE_REDIRECT_URI || 'https://mcp-servers-production-c189.up.railway.app/oauth/callback'
     );
 
     this.setupTools();
@@ -31,29 +30,107 @@ class GoogleDriveMCPServer {
   }
 
   private setupTools() {
-    // List files tool
+    // Define all available tools
+    this.server.setRequestHandler('tools/list', async () => {
+      return {
+        tools: [
+          {
+            name: 'search_file',
+            description: 'Search for files in Google Drive by name, content, or metadata',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                query: {
+                  type: 'string',
+                  description: 'Search query for files'
+                },
+                fileType: {
+                  type: 'string',
+                  description: 'Optional file type filter (e.g., "pdf", "doc", "image")'
+                }
+              },
+              required: ['query']
+            }
+          },
+          {
+            name: 'list_files',
+            description: 'List files and folders in Google Drive',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                folderId: {
+                  type: 'string',
+                  description: 'Folder ID to list contents (default: root)'
+                },
+                pageSize: {
+                  type: 'number',
+                  description: 'Number of items per page',
+                  default: 50
+                }
+              }
+            }
+          },
+          {
+            name: 'get_file_metadata',
+            description: 'Get detailed metadata for a file',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                fileId: {
+                  type: 'string',
+                  description: 'Google Drive file ID'
+                }
+              },
+              required: ['fileId']
+            }
+          },
+          {
+            name: 'read_content',
+            description: 'Read the content of a file from Google Drive',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                fileId: {
+                  type: 'string',
+                  description: 'Google Drive file ID'
+                },
+                format: {
+                  type: 'string',
+                  description: 'Content format (text, html, etc.)',
+                  default: 'text'
+                }
+              },
+              required: ['fileId']
+            }
+          }
+        ]
+      };
+    });
+
+    // Handle tool calls
     this.server.setRequestHandler('tools/call', async (request) => {
       const { name, arguments: args } = request.params;
       
       try {
         switch (name) {
-          case 'list':
-            return await this.listFiles(args?.folderId || 'root', args?.maxResults || 50);
-          
-          case 'search':
+          case 'search_file':
             return await this.searchFiles(args?.query || '', args?.maxResults || 50);
           
-          case 'getFileContent':
-            return await this.getFileContent(args?.fileId);
+          case 'list_files':
+            return await this.listFiles(args?.folderId || 'root', args?.pageSize || 50);
           
-          case 'getFileMetadata':
+          case 'get_file_metadata':
             return await this.getFileMetadata(args?.fileId);
+          
+          case 'read_content':
+            return await this.getFileContent(args?.fileId);
           
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
       } catch (error) {
-        throw new Error(`Tool execution failed: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`Tool execution failed: ${errorMessage}`);
       }
     });
   }
@@ -151,7 +228,8 @@ class GoogleDriveMCPServer {
         }
       };
     } catch (error) {
-      throw new Error(`Failed to get file content: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to get file content: ${errorMessage}`);
     }
   }
 
@@ -246,7 +324,8 @@ class GoogleDriveMCPServer {
             }]
           };
         } catch (error) {
-          throw new Error(`Failed to read file: ${error.message}`);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          throw new Error(`Failed to read file: ${errorMessage}`);
         }
       }
     });
@@ -261,7 +340,7 @@ class GoogleDriveMCPServer {
   }
 
   async start() {
-    // Start HTTP server for OAuth callback
+    // Start HTTP server for OAuth callback and health checks
     const app = express();
     app.use(cors());
     app.use(express.json());
@@ -277,30 +356,51 @@ class GoogleDriveMCPServer {
         
         res.json({ success: true, access_token: tokens.access_token });
       } catch (error) {
-        res.status(500).json({ error: error.message });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({ error: errorMessage });
       }
     });
 
     // Health check endpoint
     app.get('/health', (req, res) => {
-      res.json({ status: 'ok' });
+      res.json({ 
+        status: 'ok',
+        server: 'Google Drive MCP Server',
+        version: '2.0.0',
+        tools: ['search_file', 'list_files', 'get_file_metadata', 'read_content']
+      });
+    });
+
+    // Test endpoint
+    app.get('/test', (req, res) => {
+      res.json({
+        status: 'ok',
+        message: 'MCP server is running',
+        timestamp: new Date().toISOString(),
+        tools: ['search_file', 'list_files', 'get_file_metadata', 'read_content']
+      });
     });
 
     const port = process.env.PORT || 3001;
     app.listen(port, () => {
-      console.log(`Google Drive MCP Server running on port ${port}`);
+      console.log(`🚀 Google Drive MCP Server running on port ${port}`);
+      console.log(`🔗 Health check: http://localhost:${port}/health`);
+      console.log(`🧪 Test endpoint: http://localhost:${port}/test`);
+      console.log(`📡 SSE endpoint: http://localhost:${port}/sse`);
+      console.log(`🛠️  Available tools: 4`);
+      console.log(`📋 Tools: search_file, list_files, get_file_metadata, read_content`);
     });
 
-    // Start MCP server
-    const transport = process.env.MCP_TRANSPORT === 'stdio' 
-      ? new StdioServerTransport()
-      : new SSEServerTransport();
-
+    // Start MCP server with SSE transport
+    const transport = new SSEServerTransport();
     await this.server.connect(transport);
-    console.log('Google Drive MCP Server connected');
+    console.log('✅ Google Drive MCP Server connected with SSE transport');
   }
 }
 
 // Start the server
 const server = new GoogleDriveMCPServer();
-server.start().catch(console.error); 
+server.start().catch((error) => {
+  console.error('❌ Failed to start MCP server:', error);
+  process.exit(1);
+}); 
