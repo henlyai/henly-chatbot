@@ -237,6 +237,16 @@ export class MCPConnection extends EventEmitter {
             logger.info(`${this.getLogPrefix()} Message received: ${JSON.stringify(message)}`);
           };
 
+          transport.onerror = (error) => {
+            console.error(`[DEBUG] MCP transport error:`, error);
+            logger.error(`${this.getLogPrefix()} Transport error: ${JSON.stringify(error)}`);
+          };
+
+          transport.onopen = () => {
+            console.log(`[DEBUG] MCP transport opened`);
+            logger.info(`${this.getLogPrefix()} Transport opened`);
+          };
+
           transport.onclose = () => {
             console.log(`[DEBUG] MCP transport closed`);
             logger.info(`${this.getLogPrefix()} SSE transport closed`);
