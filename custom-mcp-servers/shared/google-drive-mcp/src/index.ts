@@ -5,26 +5,18 @@ import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import express from 'express';
 import cors from 'cors';
-import crypto from 'crypto';
 
 console.log('🚀 Starting Google Drive MCP Server...');
-
-// In-memory token storage (in production, use Redis or database)
-const tokenStore: Record<string, {
-  access_token: string;
-  refresh_token: string;
-  expiry_date: number;
-  scope: string;
-}> = {};
 
 // Initialize Google APIs
 console.log('📡 Initializing Google OAuth client...');
 const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI || 'https://mcp-servers-production-c189.up.railway.app/oauth/callback'
+  process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/oauth/callback'
 );
 
+const drive = google.drive({ version: 'v3', auth: oauth2Client });
 console.log('✅ Google APIs initialized');
 
 // Create a single MCP server instance
@@ -41,67 +33,13 @@ const server = new McpServer(
   }
 );
 
-// Helper function to get authenticated OAuth client for a user
-function getAuthenticatedClient(userId: string): OAuth2Client | null {
-  const tokens = tokenStore[userId];
-  if (!tokens) {
-    return null;
-  }
-
-  // Check if token is expired
-  if (Date.now() >= tokens.expiry_date) {
-    console.log(`🔄 Token expired for user ${userId}, attempting refresh...`);
-    // In a real implementation, you'd refresh the token here
-    // For now, we'll return null to trigger re-authentication
-    return null;
-  }
-
-  const client = new OAuth2Client(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-  );
-  client.setCredentials(tokens);
-  return client;
-}
-
-// Helper function to check authentication and return appropriate response
-function checkAuthentication(userId: string): { authenticated: boolean; errorMessage?: string } {
-  const client = getAuthenticatedClient(userId);
-  if (!client) {
-    return {
-      authenticated: false,
-      errorMessage: `I don't have access to your Google Drive at the moment. Please authenticate by visiting: https://mcp-servers-production-c189.up.railway.app/oauth/initiate?userId=${userId}`
-    };
-  }
-  return { authenticated: true };
-}
-
 // Define tools using the official pattern
 console.log('🛠️  Registering MCP tools...');
-
 server.tool('search_file', 'Search for files in Google Drive by name, content, or metadata', {
   query: z.string().describe('Search query for files'),
-  fileType: z.string().optional().describe('Optional file type filter (e.g., "pdf", "doc", "image")'),
-  userId: z.string().describe('User ID for authentication')
-}, async ({ query, fileType, userId }) => {
+  fileType: z.string().optional().describe('Optional file type filter (e.g., "pdf", "doc", "image")')
+}, async ({ query, fileType }) => {
   try {
-    // Check authentication
-    const authCheck = checkAuthentication(userId);
-    if (!authCheck.authenticated) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: authCheck.errorMessage!
-          }
-        ]
-      };
-    }
-
-    const client = getAuthenticatedClient(userId)!;
-    const drive = google.drive({ version: 'v3', auth: client });
-
     let searchQuery = `fullText contains '${query}'`;
     if (fileType) {
       searchQuery += ` and mimeType contains '${fileType}'`;
@@ -126,7 +64,6 @@ server.tool('search_file', 'Search for files in Google Drive by name, content, o
       ]
     };
   } catch (error) {
-    console.error('Error in search_file:', error);
     return {
       content: [
         {
@@ -140,26 +77,9 @@ server.tool('search_file', 'Search for files in Google Drive by name, content, o
 
 server.tool('list_files', 'List files and folders in Google Drive', {
   folderId: z.string().optional().describe('Folder ID to list contents (default: root)'),
-  pageSize: z.number().optional().describe('Number of items per page').default(50),
-  userId: z.string().describe('User ID for authentication')
-}, async ({ folderId = 'root', pageSize = 50, userId }) => {
+  pageSize: z.number().optional().describe('Number of items per page').default(50)
+}, async ({ folderId = 'root', pageSize = 50 }) => {
   try {
-    // Check authentication
-    const authCheck = checkAuthentication(userId);
-    if (!authCheck.authenticated) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: authCheck.errorMessage!
-          }
-        ]
-      };
-    }
-
-    const client = getAuthenticatedClient(userId)!;
-    const drive = google.drive({ version: 'v3', auth: client });
-
     const response = await drive.files.list({
       q: `'${folderId}' in parents and trashed=false`,
       fields: 'files(id,name,mimeType,size,modifiedTime)',
@@ -179,7 +99,6 @@ server.tool('list_files', 'List files and folders in Google Drive', {
       ]
     };
   } catch (error) {
-    console.error('Error in list_files:', error);
     return {
       content: [
         {
@@ -192,26 +111,9 @@ server.tool('list_files', 'List files and folders in Google Drive', {
 });
 
 server.tool('get_file_metadata', 'Get detailed metadata for a file', {
-  fileId: z.string().describe('Google Drive file ID'),
-  userId: z.string().describe('User ID for authentication')
-}, async ({ fileId, userId }) => {
+  fileId: z.string().describe('Google Drive file ID')
+}, async ({ fileId }) => {
   try {
-    // Check authentication
-    const authCheck = checkAuthentication(userId);
-    if (!authCheck.authenticated) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: authCheck.errorMessage!
-          }
-        ]
-      };
-    }
-
-    const client = getAuthenticatedClient(userId)!;
-    const drive = google.drive({ version: 'v3', auth: client });
-
     const response = await drive.files.get({
       fileId,
       fields: 'id,name,mimeType,size,modifiedTime,createdTime,parents,webViewLink'
@@ -232,7 +134,6 @@ server.tool('get_file_metadata', 'Get detailed metadata for a file', {
       ]
     };
   } catch (error) {
-    console.error('Error in get_file_metadata:', error);
     return {
       content: [
         {
@@ -246,26 +147,9 @@ server.tool('get_file_metadata', 'Get detailed metadata for a file', {
 
 server.tool('read_content', 'Read the content of a file from Google Drive', {
   fileId: z.string().describe('Google Drive file ID'),
-  format: z.string().optional().describe('Content format (text, html, etc.)').default('text'),
-  userId: z.string().describe('User ID for authentication')
-}, async ({ fileId, format = 'text', userId }) => {
+  format: z.string().optional().describe('Content format (text, html, etc.)').default('text')
+}, async ({ fileId, format = 'text' }) => {
   try {
-    // Check authentication
-    const authCheck = checkAuthentication(userId);
-    if (!authCheck.authenticated) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: authCheck.errorMessage!
-          }
-        ]
-      };
-    }
-
-    const client = getAuthenticatedClient(userId)!;
-    const drive = google.drive({ version: 'v3', auth: client });
-
     const response = await drive.files.get({
       fileId,
       alt: 'media'
@@ -280,7 +164,6 @@ server.tool('read_content', 'Read the content of a file from Google Drive', {
       ]
     };
   } catch (error) {
-    console.error('Error in read_content:', error);
     return {
       content: [
         {
@@ -308,8 +191,7 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    service: 'google-drive-mcp-server',
-    version: '2.0.0'
+    service: 'google-drive-mcp-server'
   });
 });
 
@@ -318,84 +200,25 @@ app.get('/test', (req, res) => {
   res.json({ 
     message: 'Google Drive MCP Server is running!',
     tools: ['search_file', 'list_files', 'get_file_metadata', 'read_content'],
-    timestamp: new Date().toISOString(),
-    oauth_configured: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
-  });
-});
-
-// OAuth initiation endpoint
-app.get('/oauth/initiate', (req, res) => {
-  const { userId } = req.query;
-  
-  if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({ 
-      error: 'User ID required',
-      message: 'Please provide a userId parameter'
-    });
-  }
-
-  // Generate OAuth state to prevent CSRF attacks
-  const state = crypto.randomBytes(32).toString('hex');
-  
-  // Store state temporarily (in production, use Redis with expiration)
-  // For now, we'll use a simple in-memory store
-  const stateStore: Record<string, { userId: string; timestamp: number }> = {};
-  stateStore[state] = { userId, timestamp: Date.now() };
-
-  // Generate OAuth URL
-  const authUrl = oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: [
-      'https://www.googleapis.com/auth/drive.readonly',
-      'https://www.googleapis.com/auth/drive.file'
-    ],
-    state: state,
-    prompt: 'consent' // Force consent to get refresh token
-  });
-
-  res.json({
-    auth_url: authUrl,
-    state: state,
-    message: 'Please visit the auth_url to authenticate with Google Drive'
+    timestamp: new Date().toISOString()
   });
 });
 
 // OAuth callback endpoint
 app.get('/oauth/callback', async (req, res) => {
-  const { code, state } = req.query;
+  const { code } = req.query;
   
   if (!code || typeof code !== 'string') {
     return res.status(400).json({ error: 'Authorization code required' });
   }
 
-  if (!state || typeof state !== 'string') {
-    return res.status(400).json({ error: 'State parameter required' });
-  }
-
   try {
-    // Verify state (in production, check against stored state)
-    // For now, we'll assume it's valid
-    
     const { tokens } = await oauth2Client.getToken(code);
-    
-    // Extract userId from state (in production, use proper state management)
-    // For now, we'll use a simple approach
-    const userId = state; // In production, decode userId from state
-    
-    // Store tokens
-    tokenStore[userId] = {
-      access_token: tokens.access_token!,
-      refresh_token: tokens.refresh_token!,
-      expiry_date: tokens.expiry_date!,
-      scope: tokens.scope!
-    };
-    
-    console.log(`✅ OAuth successful for user ${userId}`);
+    oauth2Client.setCredentials(tokens);
     
     res.json({
       status: 'success',
-      message: 'OAuth authentication successful! You can now use Google Drive tools.',
-      userId: userId
+      message: 'OAuth authentication successful'
     });
   } catch (error) {
     console.error('OAuth error:', error);
@@ -404,27 +227,6 @@ app.get('/oauth/callback', async (req, res) => {
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-});
-
-// Check authentication status endpoint
-app.get('/oauth/status/:userId', (req, res) => {
-  const { userId } = req.params;
-  
-  const tokens = tokenStore[userId];
-  if (!tokens) {
-    return res.json({
-      authenticated: false,
-      message: 'Not authenticated'
-    });
-  }
-
-  const isExpired = Date.now() >= tokens.expiry_date;
-  
-  res.json({
-    authenticated: !isExpired,
-    expired: isExpired,
-    message: isExpired ? 'Token expired' : 'Authenticated'
-  });
 });
 
 // SSE endpoint for establishing the stream (official MCP endpoint)
@@ -515,7 +317,6 @@ async function start() {
       console.log(`🎉 Google Drive MCP Server running on port ${port}`);
       console.log(`🔗 Health check: http://localhost:${port}/health`);
       console.log(`🧪 Test endpoint: http://localhost:${port}/test`);
-      console.log(`🔐 OAuth initiate: http://localhost:${port}/oauth/initiate`);
       console.log(`🔐 OAuth callback: http://localhost:${port}/oauth/callback`);
       console.log(`📡 MCP endpoint: http://localhost:${port}/mcp`);
       console.log(`📨 Messages endpoint: http://localhost:${port}/messages`);
