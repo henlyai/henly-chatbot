@@ -171,11 +171,17 @@ async function createMCPTool({ req, res, toolKey, provider: _provider }) {
       const customUserVars =
         config?.configurable?.userMCPAuthMap?.[`${Constants.mcp_prefix}${serverName}`];
 
+      // Add userId to tool arguments for authentication
+      const enhancedToolArguments = {
+        ...toolArguments,
+        userId: userId
+      };
+
       const result = await mcpManager.callTool({
         serverName,
         toolName,
         provider,
-        toolArguments,
+        toolArguments: enhancedToolArguments,
         options: {
           signal: derivedSignal,
         },
