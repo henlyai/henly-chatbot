@@ -143,19 +143,6 @@ function sendJsonRpcResponse(res, id, result, error = null) {
   res.write(data);
 }
 
-// Helper function to send JSON-RPC notification
-function sendJsonRpcNotification(res, method, params = {}) {
-  const notification = {
-    jsonrpc: "2.0",
-    method: method,
-    params: params
-  };
-  
-  const data = `data: ${JSON.stringify(notification)}\n\n`;
-  console.log(`📤 Sending JSON-RPC notification:`, JSON.stringify(notification, null, 2));
-  res.write(data);
-}
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   console.log('🏥 Health check request received');
@@ -218,6 +205,50 @@ app.get('/sse', (req, res) => {
   console.log(`🔗 Session stored: ${sessionId}`);
   console.log(`🔗 Active sessions: ${sessions.size}`);
 
+  // Send initialization message with a small delay to ensure connection is established
+  setTimeout(() => {
+    const initMessage = {
+      jsonrpc: "2.0",
+      id: 1,
+      result: {
+        protocolVersion: "2024-11-05",
+        capabilities: {
+          tools: {},
+          resources: {}
+        },
+        serverInfo: {
+          name: "Google Drive MCP Server",
+          version: "2.0.0"
+        }
+      }
+    };
+
+    console.log('📤 Sending initialization message');
+    console.log('📤 Message:', JSON.stringify(initMessage, null, 2));
+    
+    const initData = `data: ${JSON.stringify(initMessage)}\n\n`;
+    res.write(initData);
+    console.log('📤 Initialization message sent');
+
+    // Send tools list after initialization
+    setTimeout(() => {
+      const toolsMessage = {
+        jsonrpc: "2.0",
+        id: 2,
+        result: {
+          tools: Object.values(tools)
+        }
+      };
+
+      console.log('📤 Sending tools list');
+      console.log('📤 Tools:', Object.keys(tools));
+      
+      const toolsData = `data: ${JSON.stringify(toolsMessage)}\n\n`;
+      res.write(toolsData);
+      console.log('📤 Tools list sent');
+    }, 100);
+  }, 100);
+
   // Keep connection alive
   const interval = setInterval(() => {
     if (session.connected && !res.destroyed) {
@@ -252,140 +283,18 @@ app.get('/sse', (req, res) => {
   });
 });
 
-// POST endpoint for client→server communication
+// POST endpoint for client→server communication (for future use)
 app.post('/sse', (req, res) => {
   console.log('📨 POST /sse request received');
   console.log('📨 Request headers:', req.headers);
   console.log('📨 Request body:', JSON.stringify(req.body, null, 2));
   
-  try {
-    const { id, method, params } = req.body;
-    
-    if (!id || !method) {
-      console.error('❌ Invalid JSON-RPC request: missing id or method');
-      return res.status(400).json({
-        jsonrpc: "2.0",
-        id: null,
-        error: {
-          code: -32600,
-          message: "Invalid Request"
-        }
-      });
-    }
-    
-    console.log(`📨 Processing JSON-RPC request: id=${id}, method=${method}`);
-    
-    // Extract session identifier
-    const sessionId = req.headers['x-mcp-client'] || req.query.sessionId;
-    
-    if (!sessionId) {
-      console.error('❌ No session ID provided in headers or query params');
-      return res.status(400).json({
-        jsonrpc: "2.0",
-        id: id,
-        error: {
-          code: -32001,
-          message: "Session not found"
-        }
-      });
-    }
-    
-    console.log(`📨 Session ID: ${sessionId}`);
-    
-    // Find the corresponding SSE session
-    const session = sessions.get(sessionId);
-    
-    if (!session || !session.connected) {
-      console.error(`❌ Session not found or disconnected: ${sessionId}`);
-      return res.status(400).json({
-        jsonrpc: "2.0",
-        id: id,
-        error: {
-          code: -32001,
-          message: "Session not found or disconnected"
-        }
-      });
-    }
-    
-    // Update last activity
-    session.lastActivity = Date.now();
-    
-    // Handle different methods
-    switch (method) {
-      case 'initialize':
-        console.log(`📨 Handling initialize request: ${id}`);
-        const initResult = {
-          protocolVersion: "2024-11-05",
-          capabilities: {
-            tools: {},
-            resources: {}
-          },
-          serverInfo: {
-            name: "Google Drive MCP Server",
-            version: "2.0.0"
-          }
-        };
-        sendJsonRpcResponse(session.res, id, initResult);
-        break;
-        
-      case 'tools/list':
-        console.log(`📨 Handling tools/list request: ${id}`);
-        const toolsResult = {
-          tools: Object.values(tools)
-        };
-        sendJsonRpcResponse(session.res, id, toolsResult);
-        break;
-        
-      case 'tools/call':
-        console.log(`📨 Handling tools/call request: ${id}`);
-        const { name, arguments: args } = params;
-        
-        if (!name || !tools[name]) {
-          sendJsonRpcResponse(session.res, id, null, {
-            code: -32601,
-            message: `Tool '${name}' not found`
-          });
-          break;
-        }
-        
-        // For now, return a placeholder response indicating OAuth is required
-        // In a real implementation, this would handle the actual Google Drive API calls
-        sendJsonRpcResponse(session.res, id, {
-          content: [
-            {
-              type: "text",
-              text: `Tool '${name}' requires OAuth authentication. Please authenticate with Google Drive to use this tool.`
-            }
-          ]
-        });
-        break;
-        
-      default:
-        console.log(`📨 Unknown method: ${method}`);
-        sendJsonRpcResponse(session.res, id, null, {
-          code: -32601,
-          message: `Method '${method}' not found`
-        });
-    }
-    
-    // Send success response to POST request
-    res.status(200).json({
-      jsonrpc: "2.0",
-      id: id,
-      result: { status: "processed" }
-    });
-    
-  } catch (error) {
-    console.error('❌ Error processing POST /sse request:', error);
-    res.status(500).json({
-      jsonrpc: "2.0",
-      id: req.body?.id || null,
-      error: {
-        code: -32603,
-        message: "Internal error"
-      }
-    });
-  }
+  // For now, just acknowledge the request
+  res.status(200).json({
+    jsonrpc: "2.0",
+    id: req.body?.id || null,
+    result: { status: "acknowledged" }
+  });
 });
 
 // Start server
@@ -394,7 +303,6 @@ app.listen(PORT, () => {
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
   console.log(`🧪 Test endpoint: http://localhost:${PORT}/test`);
   console.log(`📡 SSE endpoint: http://localhost:${PORT}/sse`);
-  console.log(`📨 POST endpoint: http://localhost:${PORT}/sse`);
   console.log(`🛠️  Available tools: ${Object.keys(tools).length}`);
   console.log(`📋 Tools: ${Object.keys(tools).join(', ')}`);
 }); 
