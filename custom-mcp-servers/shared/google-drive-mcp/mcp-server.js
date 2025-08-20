@@ -180,11 +180,15 @@ app.get('/sse', (req, res) => {
   // Set SSE headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
+    'Cache-Control': 'no-cache, no-transform, no-store, must-revalidate',
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no',
+    'X-Content-Type-Options': 'nosniff',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Cache-Control, X-MCP-Client'
+    'Access-Control-Allow-Headers': 'Cache-Control, X-MCP-Client',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+    'Transfer-Encoding': 'chunked'
   });
 
   console.log('🔗 SSE headers set, sending initial keep-alive');
@@ -228,7 +232,12 @@ app.get('/sse', (req, res) => {
     
     const initData = `data: ${JSON.stringify(initMessage)}\n\n`;
     res.write(initData);
-    console.log('📤 Initialization message sent');
+    
+    // Force flush the response
+    if (res.flush) {
+      res.flush();
+    }
+    console.log('📤 Initialization message sent and flushed');
 
     // Send tools list after initialization
     setTimeout(() => {
@@ -245,21 +254,32 @@ app.get('/sse', (req, res) => {
       
       const toolsData = `data: ${JSON.stringify(toolsMessage)}\n\n`;
       res.write(toolsData);
-      console.log('📤 Tools list sent');
-    }, 100);
-  }, 100);
+      
+      // Force flush the response
+      if (res.flush) {
+        res.flush();
+      }
+      console.log('📤 Tools list sent and flushed');
+    }, 200);
+  }, 200);
 
-  // Keep connection alive
+  // Keep connection alive with more frequent pings
   const interval = setInterval(() => {
     if (session.connected && !res.destroyed) {
       console.log(`💓 Sending keep-alive ping for session: ${sessionId}`);
       res.write(':\n\n');
+      
+      // Force flush the keep-alive
+      if (res.flush) {
+        res.flush();
+      }
+      
       session.lastActivity = Date.now();
     } else {
       console.log(`💔 Session ${sessionId} disconnected, stopping keep-alive`);
       clearInterval(interval);
     }
-  }, 30000);
+  }, 15000); // More frequent keep-alive
 
   // Handle connection close
   req.on('close', () => {
