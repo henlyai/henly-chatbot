@@ -64,7 +64,24 @@ const getAvailablePluginsController = async (req, res) => {
 
     /** @type {{ filteredTools: string[], includedTools: string[] }} */
     const { filteredTools = [], includedTools = [] } = req.app.locals;
-    const pluginManifest = availableTools;
+    let pluginManifest = availableTools;
+
+    // Load MCP tools if MCP configuration is available
+    const customConfig = await getCustomConfig();
+    const mcpConfig = customConfig?.mcpServers ?? req.app.locals?.mcpConfig;
+    if (mcpConfig != null) {
+      const mcpManager = getMCPManager();
+      const flowsCache = getLogStores(CacheKeys.FLOWS);
+      const flowManager = flowsCache ? getFlowStateManager(flowsCache) : null;
+      const serverToolsCallback = createServerToolsCallback();
+      const getServerTools = createGetServerTools();
+      const mcpTools = await mcpManager.loadManifestTools({
+        flowManager,
+        serverToolsCallback,
+        getServerTools,
+      });
+      pluginManifest = [...mcpTools, ...pluginManifest];
+    }
 
     console.log('🔍 [PluginController] Available tools from manifest:', pluginManifest.length);
     const mcpManifestTools = pluginManifest.filter(p => p.pluginKey && p.pluginKey.includes('_mcp_'));
