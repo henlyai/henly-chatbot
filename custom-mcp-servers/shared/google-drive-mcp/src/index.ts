@@ -82,7 +82,7 @@ async function getOrganizationDriveClient(organizationId: string) {
     
     return {
       drive: google.drive({ version: 'v3', auth }),
-      folderId: mcpServer.google_drive_folder_id || 'root',
+      folderId: 'root', // Use service account's own Drive for now
       organizationName: mcpServer.organization_id
     };
   } catch (error) {
@@ -96,8 +96,11 @@ function getOrganizationIdFromContext(context: any): string {
   console.log('🔍 Debug: Context received:', JSON.stringify(context, null, 2));
   
   // Try to get from headers first (LibreChat sends this)
+  // Check multiple possible locations where the header might be
   const orgId = context?.headers?.['x-mcp-client'] || 
                 context?.headers?.['X-MCP-Client'] ||
+                context?.requestInfo?.headers?.['x-mcp-client'] ||
+                context?.requestInfo?.headers?.['X-MCP-Client'] ||
                 context?.organizationId;
   
   console.log('🔍 Debug: Organization ID found:', orgId);
@@ -107,6 +110,9 @@ function getOrganizationIdFromContext(context: any): string {
     console.error('❌ Debug: Available context keys:', Object.keys(context || {}));
     if (context?.headers) {
       console.error('❌ Debug: Available headers:', Object.keys(context.headers));
+    }
+    if (context?.requestInfo?.headers) {
+      console.error('❌ Debug: Available requestInfo headers:', Object.keys(context.requestInfo.headers));
     }
     
     // Fallback to default organization ID for testing
