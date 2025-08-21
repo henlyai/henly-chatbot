@@ -376,18 +376,26 @@ server.tool('get_file_metadata', 'Get detailed metadata for a file. Use this to 
 
     // Determine if file can be read directly
     let readabilityInfo = '';
+    let fileTypeDescription = '';
+    
     if (file.mimeType === 'application/vnd.google-apps.document') {
       readabilityInfo = '✅ Can be read directly (Google Doc)';
+      fileTypeDescription = 'Google Doc';
     } else if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
       readabilityInfo = '✅ Can be read directly (Google Sheet)';
+      fileTypeDescription = 'Google Sheet';
     } else if (file.mimeType.startsWith('text/') || file.mimeType === 'application/json') {
       readabilityInfo = '✅ Can be read directly (Text file)';
+      fileTypeDescription = 'Text File';
     } else if (file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       readabilityInfo = '⚠️  Cannot read directly (Word .docx) - Use web link to view';
+      fileTypeDescription = 'Microsoft Word Document';
     } else if (file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
       readabilityInfo = '⚠️  Cannot read directly (Excel .xlsx) - Use web link to view';
+      fileTypeDescription = 'Microsoft Excel Spreadsheet';
     } else {
       readabilityInfo = '⚠️  Cannot read directly - Use web link to view';
+      fileTypeDescription = file.mimeType;
     }
 
     return {
@@ -396,7 +404,7 @@ server.tool('get_file_metadata', 'Get detailed metadata for a file. Use this to 
           type: 'text',
           text: `📄 File Details: ${file.name}\n\n` +
                 `📋 ID: ${file.id}\n` +
-                `📁 Type: ${file.mimeType}\n` +
+                `📁 Type: ${fileTypeDescription}\n` +
                 `📏 Size: ${sizeInMB} MB\n` +
                 `📅 Created: ${new Date(file.createdTime).toLocaleString()}\n` +
                 `🔄 Modified: ${new Date(file.modifiedTime).toLocaleString()}\n` +
@@ -471,20 +479,56 @@ server.tool('read_content', 'Read the content of a file from Google Drive. Use t
     
     if (file.mimeType === 'application/vnd.google-apps.document') {
       // Google Docs - export as text
-      const response = await drive.files.export({
-        fileId,
-        mimeType: 'text/plain'
-      });
-      content = response.data;
-      fileType = 'Google Doc';
+      try {
+        console.log(`📄 Attempting to export Google Doc: ${file.name}`);
+        const response = await drive.files.export({
+          fileId,
+          mimeType: 'text/plain'
+        });
+        content = response.data;
+        fileType = 'Google Doc';
+        console.log(`✅ Successfully exported Google Doc: ${file.name} (${content.length} characters)`);
+      } catch (exportError) {
+        console.error(`❌ Failed to export Google Doc: ${exportError}`);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `📄 Google Doc: "${file.name}"\n\n` +
+                    `⚠️  Unable to export this Google Doc. This might be due to permissions or the document being empty.\n\n` +
+                    `🔗 Please access it directly: ${file.webViewLink || 'No web link available'}\n\n` +
+                    `File ID: ${fileId}\n` +
+                    `Error: ${exportError instanceof Error ? exportError.message : 'Unknown error'}`
+            }
+          ]
+        };
+      }
     } else if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
       // Google Sheets - export as CSV
-      const response = await drive.files.export({
-        fileId,
-        mimeType: 'text/csv'
-      });
-      content = response.data;
-      fileType = 'Google Sheet';
+      try {
+        console.log(`📊 Attempting to export Google Sheet: ${file.name}`);
+        const response = await drive.files.export({
+          fileId,
+          mimeType: 'text/csv'
+        });
+        content = response.data;
+        fileType = 'Google Sheet';
+        console.log(`✅ Successfully exported Google Sheet: ${file.name} (${content.length} characters)`);
+      } catch (exportError) {
+        console.error(`❌ Failed to export Google Sheet: ${exportError}`);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `📊 Google Sheet: "${file.name}"\n\n` +
+                    `⚠️  Unable to export this Google Sheet. This might be due to permissions or the sheet being empty.\n\n` +
+                    `🔗 Please access it directly: ${file.webViewLink || 'No web link available'}\n\n` +
+                    `File ID: ${fileId}\n` +
+                    `Error: ${exportError instanceof Error ? exportError.message : 'Unknown error'}`
+            }
+          ]
+        };
+      }
     } else if (file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       // Word documents - can't read directly, provide metadata instead
       return {
