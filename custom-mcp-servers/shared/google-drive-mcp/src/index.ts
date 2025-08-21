@@ -374,6 +374,22 @@ server.tool('get_file_metadata', 'Get detailed metadata for a file. Use this to 
     const file = response.data;
     const sizeInMB = file.size ? (parseInt(file.size) / (1024 * 1024)).toFixed(2) : 'Unknown';
 
+    // Determine if file can be read directly
+    let readabilityInfo = '';
+    if (file.mimeType === 'application/vnd.google-apps.document') {
+      readabilityInfo = '✅ Can be read directly (Google Doc)';
+    } else if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
+      readabilityInfo = '✅ Can be read directly (Google Sheet)';
+    } else if (file.mimeType.startsWith('text/') || file.mimeType === 'application/json') {
+      readabilityInfo = '✅ Can be read directly (Text file)';
+    } else if (file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      readabilityInfo = '⚠️  Cannot read directly (Word .docx) - Use web link to view';
+    } else if (file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+      readabilityInfo = '⚠️  Cannot read directly (Excel .xlsx) - Use web link to view';
+    } else {
+      readabilityInfo = '⚠️  Cannot read directly - Use web link to view';
+    }
+
     return {
       content: [
         {
@@ -386,7 +402,8 @@ server.tool('get_file_metadata', 'Get detailed metadata for a file. Use this to 
                 `🔄 Modified: ${new Date(file.modifiedTime).toLocaleString()}\n` +
                 `🔗 View: ${file.webViewLink}\n` +
                 (file.description ? `📝 Description: ${file.description}\n` : '') +
-                `\n💡 Tip: Use read_content to view the actual file content.`
+                `\n📖 Readability: ${readabilityInfo}\n` +
+                `💡 Tip: Use read_content for readable files, or click the web link for others.`
         }
       ]
     };
@@ -448,13 +465,83 @@ server.tool('read_content', 'Read the content of a file from Google Drive. Use t
       };
     }
 
-    const response = await drive.files.get({
-      fileId,
-      alt: 'media'
-    });
+    // Handle different file types appropriately
+    let content = '';
+    let fileType = 'unknown';
+    
+    if (file.mimeType === 'application/vnd.google-apps.document') {
+      // Google Docs - export as text
+      const response = await drive.files.export({
+        fileId,
+        mimeType: 'text/plain'
+      });
+      content = response.data;
+      fileType = 'Google Doc';
+    } else if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
+      // Google Sheets - export as CSV
+      const response = await drive.files.export({
+        fileId,
+        mimeType: 'text/csv'
+      });
+      content = response.data;
+      fileType = 'Google Sheet';
+    } else if (file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      // Word documents - can't read directly, provide metadata instead
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📄 Word Document: "${file.name}"\n\n` +
+                  `⚠️  Word documents (.docx) cannot be read directly through the API. ` +
+                  `Please use get_file_metadata to view file details and access it via the web link.\n\n` +
+                  `File ID: ${fileId}\n` +
+                  `Size: ${sizeInMB.toFixed(2)} MB\n` +
+                  `Type: Microsoft Word Document`
+          }
+        ]
+      };
+    } else if (file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+      // Excel files - can't read directly, provide metadata instead
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📊 Excel Spreadsheet: "${file.name}"\n\n` +
+                  `⚠️  Excel files (.xlsx) cannot be read directly through the API. ` +
+                  `Please use get_file_metadata to view file details and access it via the web link.\n\n` +
+                  `File ID: ${fileId}\n` +
+                  `Size: ${sizeInMB.toFixed(2)} MB\n` +
+                  `Type: Microsoft Excel Spreadsheet`
+          }
+        ]
+      };
+    } else if (file.mimeType.startsWith('text/') || file.mimeType === 'application/json') {
+      // Text files - read directly
+      const response = await drive.files.get({
+        fileId,
+        alt: 'media'
+      });
+      content = response.data;
+      fileType = 'Text File';
+    } else {
+      // Other file types - provide metadata
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📎 File: "${file.name}"\n\n` +
+                  `⚠️  This file type (${file.mimeType}) cannot be read directly. ` +
+                  `Please use get_file_metadata to view file details and access it via the web link.\n\n` +
+                  `File ID: ${fileId}\n` +
+                  `Size: ${sizeInMB.toFixed(2)} MB\n` +
+                  `Type: ${file.mimeType}`
+          }
+        ]
+      };
+    }
 
-    const content = response.data;
-    const truncatedContent = typeof content === 'string' && content.length > 5000 
+    // Truncate content if too long
+    const truncatedContent = content.length > 5000 
       ? content.substring(0, 5000) + '\n\n... (content truncated for performance)'
       : content;
 
@@ -462,7 +549,7 @@ server.tool('read_content', 'Read the content of a file from Google Drive. Use t
       content: [
         {
           type: 'text',
-          text: `📖 Content of "${file.name}" (${format}):\n\n${truncatedContent}`
+          text: `📖 Content of "${file.name}" (${fileType}):\n\n${truncatedContent}`
         }
       ]
     };
