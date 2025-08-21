@@ -303,30 +303,30 @@ server.tool('list_files', 'List files and folders in Google Drive. Use this to e
     const files = await getCachedFileListing(cacheKey, drive, targetFolderId, pageSize);
 
     // Group files by type for better organization
-    const folders = files.filter(f => f.mimeType === 'application/vnd.google-apps.folder');
-    const documents = files.filter(f => f.mimeType.includes('document') || f.mimeType.includes('spreadsheet'));
-    const otherFiles = files.filter(f => !f.mimeType.includes('folder') && !f.mimeType.includes('document') && !f.mimeType.includes('spreadsheet'));
+    const folders = files.filter((f: any) => f.mimeType === 'application/vnd.google-apps.folder');
+    const documents = files.filter((f: any) => f.mimeType.includes('document') || f.mimeType.includes('spreadsheet'));
+    const otherFiles = files.filter((f: any) => !f.mimeType.includes('folder') && !f.mimeType.includes('document') && !f.mimeType.includes('spreadsheet'));
 
     return {
       content: [
         {
           type: 'text',
           text: `📁 Files in your Google Drive folder:\n\n` +
-                `📂 Folders (${folders.length}):\n${
-                  folders.map(file => 
-                    `  📁 ${file.name} (${file.id})`
-                  ).join('\n') || '  No folders'
-                }\n\n` +
-                `📄 Documents & Spreadsheets (${documents.length}):\n${
-                  documents.map(file => 
-                    `  📄 ${file.name} (${file.id}) - Modified: ${new Date(file.modifiedTime).toLocaleDateString()}`
-                  ).join('\n') || '  No documents'
-                }\n\n` +
-                `📎 Other Files (${otherFiles.length}):\n${
-                  otherFiles.map(file => 
-                    `  📎 ${file.name} (${file.id}) - ${file.mimeType}`
-                  ).join('\n') || '  No other files'
-                }\n\n` +
+                                 `📂 Folders (${folders.length}):\n${
+                   folders.map((file: any) => 
+                     `  📁 ${file.name} (${file.id})`
+                   ).join('\n') || '  No folders'
+                 }\n\n` +
+                 `📄 Documents & Spreadsheets (${documents.length}):\n${
+                   documents.map((file: any) => 
+                     `  📄 ${file.name} (${file.id}) - Modified: ${new Date(file.modifiedTime).toLocaleDateString()}`
+                   ).join('\n') || '  No documents'
+                 }\n\n` +
+                 `📎 Other Files (${otherFiles.length}):\n${
+                   otherFiles.map((file: any) => 
+                     `  📎 ${file.name} (${file.id}) - ${file.mimeType}`
+                   ).join('\n') || '  No other files'
+                 }\n\n` +
                 `💡 Tip: Use search_file to find specific content, or get_file_metadata to get details about a specific file.`
         }
       ]
@@ -608,4 +608,61 @@ app.post('/messages', async (req, res) => {
   
   const transport = transports[sessionId];
   if (!transport) {
-    console.error(`
+    console.error(`❌ No active transport found for session ID: ${sessionId}`);
+    res.status(404).send('Session not found');
+    return;
+  }
+  
+  try {
+    // Handle the POST message with the transport
+    await transport.handlePostMessage(req, res, req.body);
+  } catch (error) {
+    console.error('❌ Error handling request:', error);
+    if (!res.headersSent) {
+      res.status(500).send('Error handling request');
+    }
+  }
+});
+
+console.log('✅ Express app setup complete');
+
+// Start the server
+async function start() {
+  const port = process.env.PORT || 3001;
+  
+  console.log(`🚀 Starting server on port ${port}...`);
+  
+  // Initialize Supabase client
+  await initializeSupabase();
+  
+  try {
+    app.listen(port, () => {
+      console.log(`🎉 Google Drive MCP Server running on port ${port}`);
+      console.log(`🔗 Health check: http://localhost:${port}/health`);
+      console.log(`🧪 Test endpoint: http://localhost:${port}/test`);
+      console.log(`📡 MCP endpoint: http://localhost:${port}/mcp`);
+      console.log(`📨 Messages endpoint: http://localhost:${port}/messages`);
+      console.log(`🔐 Auth type: Organization-based service account`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 Received SIGTERM, shutting down gracefully...');
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 Received SIGINT, shutting down gracefully...');
+  process.exit(0);
+});
+
+console.log('🚀 Starting application...');
+start().catch((error) => {
+  console.error('❌ Failed to start application:', error);
+  process.exit(1);
+});
