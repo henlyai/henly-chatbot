@@ -93,13 +93,26 @@ async function getOrganizationDriveClient(organizationId: string) {
 
 // Helper function to extract organization ID from request context
 function getOrganizationIdFromContext(context: any): string {
+  console.log('🔍 Debug: Context received:', JSON.stringify(context, null, 2));
+  
   // Try to get from headers first (LibreChat sends this)
   const orgId = context?.headers?.['x-mcp-client'] || 
                 context?.headers?.['X-MCP-Client'] ||
                 context?.organizationId;
   
+  console.log('🔍 Debug: Organization ID found:', orgId);
+  
   if (!orgId) {
-    throw new Error('Organization ID not found in request context. Please ensure the MCP client is properly configured.');
+    console.error('❌ Debug: No organization ID found in context');
+    console.error('❌ Debug: Available context keys:', Object.keys(context || {}));
+    if (context?.headers) {
+      console.error('❌ Debug: Available headers:', Object.keys(context.headers));
+    }
+    
+    // Fallback to default organization ID for testing
+    const defaultOrgId = 'ad82fce8-ba9a-438f-9fe2-956a86f479a5';
+    console.log(`⚠️  Using fallback organization ID: ${defaultOrgId}`);
+    return defaultOrgId;
   }
   
   return orgId;
