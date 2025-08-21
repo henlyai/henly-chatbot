@@ -78,11 +78,14 @@ async function getOrganizationDriveClient(organizationId: string) {
     );
     
     const credentials = JSON.parse(serviceAccountKey);
-    const auth = new GoogleAuth({ credentials });
+    const auth = new GoogleAuth({ 
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/drive.readonly']
+    });
     
     return {
       drive: google.drive({ version: 'v3', auth }),
-      folderId: 'root', // Use service account's own Drive for now
+      folderId: mcpServer.google_drive_folder_id || 'root', // Use configured folder or fallback to root
       organizationName: mcpServer.organization_id
     };
   } catch (error) {
