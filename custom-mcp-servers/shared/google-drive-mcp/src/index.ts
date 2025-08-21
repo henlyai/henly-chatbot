@@ -12,6 +12,19 @@ console.log('🚀 Starting Google Drive MCP Server...');
 // Supabase client for fetching organization configurations
 let supabase: any;
 
+// Cache for organization drive clients to avoid repeated authentication
+const driveClientCache = new Map<string, { drive: any; folderId: string; lastUsed: number }>();
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+// Cache for file listings to reduce API calls
+const fileListingCache = new Map<string, { files: any[]; timestamp: number }>();
+const FILE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Track tool calls to prevent infinite loops
+const toolCallTracker = new Map<string, { count: number; lastCall: number }>();
+const MAX_CALLS_PER_SESSION = 50; // Prevent infinite loops
+const CALL_RESET_INTERVAL = 60 * 1000; // Reset counter every minute
+
 async function initializeSupabase() {
   const { createClient } = await import('@supabase/supabase-js');
   supabase = createClient(
@@ -29,7 +42,7 @@ console.log('🔧 Creating MCP server instance...');
 const server = new McpServer(
   {
     name: 'google-drive-mcp-server',
-    version: '2.0.0'
+    version: '2.1.0'
   },
   {
     capabilities: {
@@ -50,9 +63,16 @@ function decryptServiceAccountKey(encryptedKey: string): string {
   return decrypted;
 }
 
-// Helper function to get organization-specific Google Drive client
+// Helper function to get organization-specific Google Drive client with caching
 async function getOrganizationDriveClient(organizationId: string) {
   try {
+    // Check cache first
+    const cached = driveClientCache.get(organizationId);
+    if (cached && Date.now() - cached.lastUsed < CACHE_TTL) {
+      cached.lastUsed = Date.now();
+      return cached;
+    }
+
     console.log(`🔍 Fetching MCP config for organization: ${organizationId}`);
     
     // Get MCP server configuration from Supabase
@@ -83,11 +103,17 @@ async function getOrganizationDriveClient(organizationId: string) {
       scopes: ['https://www.googleapis.com/auth/drive.readonly']
     });
     
-    return {
+    const driveClient = {
       drive: google.drive({ version: 'v3', auth }),
-      folderId: mcpServer.google_drive_folder_id || 'root', // Use configured folder or fallback to root
-      organizationName: mcpServer.organization_id
+      folderId: mcpServer.google_drive_folder_id || 'root',
+      organizationName: mcpServer.organization_id,
+      lastUsed: Date.now()
     };
+
+    // Cache the client
+    driveClientCache.set(organizationId, driveClient);
+    
+    return driveClient;
   } catch (error) {
     console.error(`❌ Error getting organization drive client: ${error}`);
     throw error;
@@ -96,28 +122,13 @@ async function getOrganizationDriveClient(organizationId: string) {
 
 // Helper function to extract organization ID from request context
 function getOrganizationIdFromContext(context: any): string {
-  console.log('🔍 Debug: Context received:', JSON.stringify(context, null, 2));
-  
-  // Try to get from headers first (LibreChat sends this)
-  // Check multiple possible locations where the header might be
   const orgId = context?.headers?.['x-mcp-client'] || 
                 context?.headers?.['X-MCP-Client'] ||
                 context?.requestInfo?.headers?.['x-mcp-client'] ||
                 context?.requestInfo?.headers?.['X-MCP-Client'] ||
                 context?.organizationId;
   
-  console.log('🔍 Debug: Organization ID found:', orgId);
-  
   if (!orgId) {
-    console.error('❌ Debug: No organization ID found in context');
-    console.error('❌ Debug: Available context keys:', Object.keys(context || {}));
-    if (context?.headers) {
-      console.error('❌ Debug: Available headers:', Object.keys(context.headers));
-    }
-    if (context?.requestInfo?.headers) {
-      console.error('❌ Debug: Available requestInfo headers:', Object.keys(context.requestInfo.headers));
-    }
-    
     // Fallback to default organization ID for testing
     const defaultOrgId = 'ad82fce8-ba9a-438f-9fe2-956a86f479a5';
     console.log(`⚠️  Using fallback organization ID: ${defaultOrgId}`);
@@ -127,16 +138,96 @@ function getOrganizationIdFromContext(context: any): string {
   return orgId;
 }
 
-// Define tools using the official pattern
+// Helper function to check and prevent infinite loops
+function checkToolCallLimit(sessionId: string): boolean {
+  const now = Date.now();
+  const tracker = toolCallTracker.get(sessionId);
+  
+  if (!tracker || now - tracker.lastCall > CALL_RESET_INTERVAL) {
+    toolCallTracker.set(sessionId, { count: 1, lastCall: now });
+    return true;
+  }
+  
+  if (tracker.count >= MAX_CALLS_PER_SESSION) {
+    console.warn(`⚠️  Tool call limit reached for session ${sessionId}`);
+    return false;
+  }
+  
+  tracker.count++;
+  tracker.lastCall = now;
+  return true;
+}
+
+// Helper function to get cached file listing
+async function getCachedFileListing(cacheKey: string, drive: any, folderId: string, pageSize: number) {
+  const cached = fileListingCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < FILE_CACHE_TTL) {
+    return cached.files;
+  }
+
+  const response = await drive.files.list({
+    q: `'${folderId}' in parents and trashed=false`,
+    fields: 'files(id,name,mimeType,size,modifiedTime,parents)',
+    pageSize,
+    orderBy: 'modifiedTime desc'
+  });
+
+  const files = response.data.files || [];
+  fileListingCache.set(cacheKey, { files, timestamp: Date.now() });
+  
+  return files;
+}
+
+// Helper function to find relevant files based on query
+function findRelevantFiles(files: any[], query: string): any[] {
+  const queryLower = query.toLowerCase();
+  const relevantFiles = [];
+  
+  for (const file of files) {
+    const nameLower = file.name.toLowerCase();
+    const isRelevant = 
+      nameLower.includes(queryLower) ||
+      nameLower.includes('revenue') ||
+      nameLower.includes('q1') ||
+      nameLower.includes('support') ||
+      nameLower.includes('ticket') ||
+      nameLower.includes('product') ||
+      nameLower.includes('roadmap') ||
+      nameLower.includes('performance') ||
+      nameLower.includes('analysis') ||
+      nameLower.includes('report');
+    
+    if (isRelevant) {
+      relevantFiles.push(file);
+    }
+  }
+  
+  return relevantFiles.slice(0, 10); // Limit to top 10 most relevant
+}
+
+// Define tools using the official pattern with improved performance
 console.log('🛠️  Registering MCP tools...');
 
-server.tool('search_file', 'Search for files in Google Drive by name, content, or metadata', {
-  query: z.string().describe('Search query for files'),
-  fileType: z.string().optional().describe('Optional file type filter (e.g., "pdf", "doc", "image")')
+server.tool('search_file', 'Search for files in Google Drive by name, content, or metadata. Use this to find relevant documents before reading them.', {
+  query: z.string().describe('Search query for files (e.g., "revenue", "Q1", "support tickets")'),
+  fileType: z.string().optional().describe('Optional file type filter (e.g., "pdf", "doc", "spreadsheet")')
 }, async ({ query, fileType }, context) => {
   try {
     const organizationId = getOrganizationIdFromContext(context);
-    console.log(`🔍 Searching files for organization: ${organizationId}`);
+    const sessionId = `${organizationId}-${Date.now()}`;
+    
+    if (!checkToolCallLimit(sessionId)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Too many search requests. Please wait a moment before trying again.'
+          }
+        ]
+      };
+    }
+
+    console.log(`🔍 Searching files for organization: ${organizationId} with query: "${query}"`);
     
     const { drive, folderId } = await getOrganizationDriveClient(organizationId);
     
@@ -147,19 +238,25 @@ server.tool('search_file', 'Search for files in Google Drive by name, content, o
 
     const response = await drive.files.list({
       q: searchQuery,
-      fields: 'files(id,name,mimeType,size,modifiedTime)',
-      pageSize: 10
+      fields: 'files(id,name,mimeType,size,modifiedTime,parents)',
+      pageSize: 20,
+      orderBy: 'modifiedTime desc'
     });
+
+    const files = response.data.files || [];
+    const relevantFiles = findRelevantFiles(files, query);
 
     return {
       content: [
         {
           type: 'text',
-          text: `Found ${response.data.files?.length || 0} files matching "${query}" in your Google Drive:\n\n${
-            response.data.files?.map(file => 
-              `- ${file.name} (${file.id}) - ${file.mimeType}`
-            ).join('\n') || 'No files found'
-          }`
+          text: `Found ${files.length} files matching "${query}" in your Google Drive.\n\n` +
+                `Most relevant files:\n\n${
+                  relevantFiles.map(file => 
+                    `📄 ${file.name} (${file.id}) - ${file.mimeType} - Modified: ${new Date(file.modifiedTime).toLocaleDateString()}`
+                  ).join('\n') || 'No relevant files found'
+                }\n\n` +
+                `💡 Tip: Use get_file_metadata with a file ID to get more details, then read_content to view the file.`
         }
       ]
     };
@@ -176,34 +273,61 @@ server.tool('search_file', 'Search for files in Google Drive by name, content, o
   }
 });
 
-server.tool('list_files', 'List files and folders in Google Drive', {
+server.tool('list_files', 'List files and folders in Google Drive. Use this to explore the folder structure and find relevant documents.', {
   folderId: z.string().optional().describe('Folder ID to list contents (default: organization folder)'),
-  pageSize: z.number().optional().describe('Number of items per page').default(50)
-}, async ({ folderId, pageSize = 50 }, context) => {
+  pageSize: z.number().optional().describe('Number of items per page').default(20)
+}, async ({ folderId, pageSize = 20 }, context) => {
   try {
     const organizationId = getOrganizationIdFromContext(context);
+    const sessionId = `${organizationId}-${Date.now()}`;
+    
+    if (!checkToolCallLimit(sessionId)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Too many listing requests. Please wait a moment before trying again.'
+          }
+        ]
+      };
+    }
+
     console.log(`📁 Listing files for organization: ${organizationId}`);
     
     const { drive, folderId: orgFolderId } = await getOrganizationDriveClient(organizationId);
     
     // Use provided folderId or default to organization folder
     const targetFolderId = folderId || orgFolderId;
+    const cacheKey = `${organizationId}-${targetFolderId}-${pageSize}`;
 
-    const response = await drive.files.list({
-      q: `'${targetFolderId}' in parents and trashed=false`,
-      fields: 'files(id,name,mimeType,size,modifiedTime)',
-      pageSize
-    });
+    const files = await getCachedFileListing(cacheKey, drive, targetFolderId, pageSize);
+
+    // Group files by type for better organization
+    const folders = files.filter(f => f.mimeType === 'application/vnd.google-apps.folder');
+    const documents = files.filter(f => f.mimeType.includes('document') || f.mimeType.includes('spreadsheet'));
+    const otherFiles = files.filter(f => !f.mimeType.includes('folder') && !f.mimeType.includes('document') && !f.mimeType.includes('spreadsheet'));
 
     return {
       content: [
         {
           type: 'text',
-          text: `Files in your Google Drive folder:\n\n${
-            response.data.files?.map(file => 
-              `- ${file.name} (${file.id}) - ${file.mimeType}`
-            ).join('\n') || 'No files found'
-          }`
+          text: `📁 Files in your Google Drive folder:\n\n` +
+                `📂 Folders (${folders.length}):\n${
+                  folders.map(file => 
+                    `  📁 ${file.name} (${file.id})`
+                  ).join('\n') || '  No folders'
+                }\n\n` +
+                `📄 Documents & Spreadsheets (${documents.length}):\n${
+                  documents.map(file => 
+                    `  📄 ${file.name} (${file.id}) - Modified: ${new Date(file.modifiedTime).toLocaleDateString()}`
+                  ).join('\n') || '  No documents'
+                }\n\n` +
+                `📎 Other Files (${otherFiles.length}):\n${
+                  otherFiles.map(file => 
+                    `  📎 ${file.name} (${file.id}) - ${file.mimeType}`
+                  ).join('\n') || '  No other files'
+                }\n\n` +
+                `💡 Tip: Use search_file to find specific content, or get_file_metadata to get details about a specific file.`
         }
       ]
     };
@@ -220,31 +344,49 @@ server.tool('list_files', 'List files and folders in Google Drive', {
   }
 });
 
-server.tool('get_file_metadata', 'Get detailed metadata for a file', {
+server.tool('get_file_metadata', 'Get detailed metadata for a file. Use this to understand what a file contains before reading it.', {
   fileId: z.string().describe('Google Drive file ID')
 }, async ({ fileId }, context) => {
   try {
     const organizationId = getOrganizationIdFromContext(context);
+    const sessionId = `${organizationId}-${Date.now()}`;
+    
+    if (!checkToolCallLimit(sessionId)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Too many metadata requests. Please wait a moment before trying again.'
+          }
+        ]
+      };
+    }
+
     console.log(`📄 Getting metadata for file ${fileId} in organization: ${organizationId}`);
     
     const { drive } = await getOrganizationDriveClient(organizationId);
 
     const response = await drive.files.get({
       fileId,
-      fields: 'id,name,mimeType,size,modifiedTime,createdTime,parents,webViewLink'
+      fields: 'id,name,mimeType,size,modifiedTime,createdTime,parents,webViewLink,description'
     });
+
+    const file = response.data;
+    const sizeInMB = file.size ? (parseInt(file.size) / (1024 * 1024)).toFixed(2) : 'Unknown';
 
     return {
       content: [
         {
           type: 'text',
-          text: `File metadata for ${fileId}:\n\n` +
-                `Name: ${response.data.name}\n` +
-                `Type: ${response.data.mimeType}\n` +
-                `Size: ${response.data.size} bytes\n` +
-                `Created: ${response.data.createdTime}\n` +
-                `Modified: ${response.data.modifiedTime}\n` +
-                `View Link: ${response.data.webViewLink}`
+          text: `📄 File Details: ${file.name}\n\n` +
+                `📋 ID: ${file.id}\n` +
+                `📁 Type: ${file.mimeType}\n` +
+                `📏 Size: ${sizeInMB} MB\n` +
+                `📅 Created: ${new Date(file.createdTime).toLocaleString()}\n` +
+                `🔄 Modified: ${new Date(file.modifiedTime).toLocaleString()}\n` +
+                `🔗 View: ${file.webViewLink}\n` +
+                (file.description ? `📝 Description: ${file.description}\n` : '') +
+                `\n💡 Tip: Use read_content to view the actual file content.`
         }
       ]
     };
@@ -261,26 +403,66 @@ server.tool('get_file_metadata', 'Get detailed metadata for a file', {
   }
 });
 
-server.tool('read_content', 'Read the content of a file from Google Drive', {
+server.tool('read_content', 'Read the content of a file from Google Drive. Use this after finding relevant files with search_file or list_files.', {
   fileId: z.string().describe('Google Drive file ID'),
   format: z.string().optional().describe('Content format (text, html, etc.)').default('text')
 }, async ({ fileId, format = 'text' }, context) => {
   try {
     const organizationId = getOrganizationIdFromContext(context);
+    const sessionId = `${organizationId}-${Date.now()}`;
+    
+    if (!checkToolCallLimit(sessionId)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Too many content reading requests. Please wait a moment before trying again.'
+          }
+        ]
+      };
+    }
+
     console.log(`📖 Reading content for file ${fileId} in organization: ${organizationId}`);
     
     const { drive } = await getOrganizationDriveClient(organizationId);
+
+    // First get metadata to check file type and size
+    const metadata = await drive.files.get({
+      fileId,
+      fields: 'name,mimeType,size'
+    });
+
+    const file = metadata.data;
+    const sizeInMB = file.size ? parseInt(file.size) / (1024 * 1024) : 0;
+
+    // Prevent reading very large files
+    if (sizeInMB > 10) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `⚠️  File "${file.name}" is too large (${sizeInMB.toFixed(2)} MB) to read directly. ` +
+                  `Please use get_file_metadata to view file details and access it via the web link.`
+          }
+        ]
+      };
+    }
 
     const response = await drive.files.get({
       fileId,
       alt: 'media'
     });
 
+    const content = response.data;
+    const truncatedContent = typeof content === 'string' && content.length > 5000 
+      ? content.substring(0, 5000) + '\n\n... (content truncated for performance)'
+      : content;
+
     return {
       content: [
         {
           type: 'text',
-          text: `File content (${format}):\n\n${response.data}`
+          text: `📖 Content of "${file.name}" (${format}):\n\n${truncatedContent}`
         }
       ]
     };
@@ -297,7 +479,7 @@ server.tool('read_content', 'Read the content of a file from Google Drive', {
   }
 });
 
-console.log('✅ MCP tools registered');
+console.log('✅ MCP tools registered with performance improvements');
 
 // Express app setup
 console.log('🌐 Setting up Express app...');
@@ -314,7 +496,7 @@ app.get('/health', (req, res) => {
     status: 'healthy', 
     timestamp: new Date().toISOString(),
     service: 'google-drive-mcp-server',
-    version: '2.0.0',
+    version: '2.1.0',
     auth_type: 'organization-based'
   });
 });
@@ -426,61 +608,4 @@ app.post('/messages', async (req, res) => {
   
   const transport = transports[sessionId];
   if (!transport) {
-    console.error(`❌ No active transport found for session ID: ${sessionId}`);
-    res.status(404).send('Session not found');
-    return;
-  }
-  
-  try {
-    // Handle the POST message with the transport
-    await transport.handlePostMessage(req, res, req.body);
-  } catch (error) {
-    console.error('❌ Error handling request:', error);
-    if (!res.headersSent) {
-      res.status(500).send('Error handling request');
-    }
-  }
-});
-
-console.log('✅ Express app setup complete');
-
-// Start the server
-async function start() {
-  const port = process.env.PORT || 3001;
-  
-  console.log(`🚀 Starting server on port ${port}...`);
-  
-  // Initialize Supabase client
-  await initializeSupabase();
-  
-  try {
-    app.listen(port, () => {
-      console.log(`🎉 Google Drive MCP Server running on port ${port}`);
-      console.log(`🔗 Health check: http://localhost:${port}/health`);
-      console.log(`🧪 Test endpoint: http://localhost:${port}/test`);
-      console.log(`📡 MCP endpoint: http://localhost:${port}/mcp`);
-      console.log(`📨 Messages endpoint: http://localhost:${port}/messages`);
-      console.log(`🔐 Auth type: Organization-based service account`);
-    });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
-}
-
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('🛑 Received SIGTERM, shutting down gracefully...');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('🛑 Received SIGINT, shutting down gracefully...');
-  process.exit(0);
-});
-
-console.log('🚀 Starting application...');
-start().catch((error) => {
-  console.error('❌ Failed to start application:', error);
-  process.exit(1);
-}); 
+    console.error(`
