@@ -1,28 +1,26 @@
-FROM node:18-alpine
+# Use Node.js 20 for better Supabase compatibility
+FROM node:20-alpine
 
+# Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (including dev dependencies for build)
+# Install dependencies
 RUN npm ci
 
 # Copy source code
 COPY . .
 
-# Build the application (compile TypeScript only)
+# Build the application
 RUN npm run build
 
-# Remove dev dependencies to reduce image size
+# Prune production dependencies
 RUN npm prune --production
 
 # Expose port
 EXPOSE 3002
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3002/health || exit 1
-
-# Start the application
+# Start the server
 CMD ["npm", "start"] 
