@@ -442,15 +442,15 @@ server.tool('send_message', 'Send a message to a Slack channel or user. Use chan
   }
 });
 
-// Tool 4: Search messages
-server.tool('search_messages', 'Search for messages in Slack channels. Use this to find specific conversations or information.', {
+// Slack Tool 3: Search messages
+server.tool('slack_search_messages', 'Search for messages in Slack channels. Use this to find specific conversations or information.', {
   query: z.string().describe('Search query to find messages'),
   channel: z.string().optional().describe('Specific channel ID to search in (optional)'),
   limit: z.number().optional().describe('Maximum number of results (default: 20)').default(20)
 }, async ({ query, channel, limit }, context) => {
   try {
     const organizationId = getOrganizationIdFromContext(context);
-    const sessionId = `${organizationId}-${Date.now()}`;
+    const sessionId = `${organizationId}-slack-search-${Date.now()}`;
     
     if (!checkToolCallLimit(sessionId)) {
       return {
@@ -472,15 +472,20 @@ server.tool('search_messages', 'Search for messages in Slack channels. Use this 
       throw new Error('Limit must be between 1 and 100');
     }
 
-    console.log(`🔍 Searching messages for organization: ${organizationId} with query: "${query}"`);
+    console.log(`🔍 Searching Slack messages for organization: ${organizationId} with query: "${query}"`);
     
     const client = await getOrganizationSlackClient(organizationId);
     
-    const result = await client.search.messages({
+    const searchParams: any = {
       query,
-      channel,
       count: limit
-    });
+    };
+    
+    if (channel) {
+      searchParams.channel = channel;
+    }
+
+    const result = await client.search.messages(searchParams);
 
     const messages = result.messages?.matches || [];
     
@@ -489,7 +494,7 @@ server.tool('search_messages', 'Search for messages in Slack channels. Use this 
         content: [
           {
             type: 'text',
-            text: `No messages found matching "${query}"${channel ? ` in channel ${channel}` : ''}.`
+            text: `No Slack messages found matching "${query}"${channel ? ` in channel ${channel}` : ''}.`
           }
         ]
       };
@@ -503,25 +508,25 @@ server.tool('search_messages', 'Search for messages in Slack channels. Use this 
       content: [
         {
           type: 'text',
-          text: `Found ${messages.length} messages matching "${query}":\n\n${messageList}\n\n💡 Tip: Use send_message with thread_ts to reply to specific messages.`
+          text: `Found ${messages.length} Slack messages matching "${query}":\n\n${messageList}\n\n💡 Tip: Use slack_send_message with thread_ts to reply to specific messages.`
         }
       ]
     };
   } catch (error) {
-    console.error(`❌ Error in search_messages: ${error}`);
+    console.error(`❌ Error in slack_search_messages: ${error}`);
     return {
       content: [
         {
           type: 'text',
-          text: `Error searching messages: ${sanitizeErrorMessage(error)}`
+          text: `Error searching Slack messages: ${sanitizeErrorMessage(error)}`
         }
       ]
     };
   }
 });
 
-// Tool 5: Get channel history
-server.tool('get_channel_history', 'Get recent messages from a specific Slack channel. Use this to see recent conversations.', {
+// Slack Tool 4: Get channel history
+server.tool('slack_get_channel_history', 'Get recent messages from a specific Slack channel. Use this to see recent conversations.', {
   channel: z.string().describe('Channel ID to get history from'),
   limit: z.number().optional().describe('Maximum number of messages (default: 50)').default(50),
   oldest: z.string().optional().describe('Start time (Unix timestamp)'),
@@ -529,7 +534,7 @@ server.tool('get_channel_history', 'Get recent messages from a specific Slack ch
 }, async ({ channel, limit, oldest, latest }, context) => {
   try {
     const organizationId = getOrganizationIdFromContext(context);
-    const sessionId = `${organizationId}-${Date.now()}`;
+    const sessionId = `${organizationId}-slack-history-${Date.now()}`;
     
     if (!checkToolCallLimit(sessionId)) {
       return {
@@ -551,16 +556,24 @@ server.tool('get_channel_history', 'Get recent messages from a specific Slack ch
       throw new Error('Limit must be between 1 and 1000');
     }
 
-    console.log(`📜 Getting channel history for ${channel} in organization: ${organizationId}`);
+    console.log(`📜 Getting Slack channel history for ${channel} in organization: ${organizationId}`);
     
     const client = await getOrganizationSlackClient(organizationId);
     
-    const result = await client.conversations.history({
+    const historyParams: any = {
       channel,
-      limit,
-      oldest,
-      latest
-    });
+      limit
+    };
+    
+    if (oldest) {
+      historyParams.oldest = oldest;
+    }
+    
+    if (latest) {
+      historyParams.latest = latest;
+    }
+
+    const result = await client.conversations.history(historyParams);
 
     const messages = result.messages || [];
     
@@ -569,7 +582,7 @@ server.tool('get_channel_history', 'Get recent messages from a specific Slack ch
         content: [
           {
             type: 'text',
-            text: `No messages found in channel ${channel}.`
+            text: `No messages found in Slack channel ${channel}.`
           }
         ]
       };
@@ -583,17 +596,17 @@ server.tool('get_channel_history', 'Get recent messages from a specific Slack ch
       content: [
         {
           type: 'text',
-          text: `Recent messages in channel ${channel}:\n\n${messageList}\n\n💡 Tip: Use send_message to reply to the channel or specific messages.`
+          text: `Recent messages in Slack channel ${channel}:\n\n${messageList}\n\n💡 Tip: Use slack_send_message to reply to the channel or specific messages.`
         }
       ]
     };
   } catch (error) {
-    console.error(`❌ Error in get_channel_history: ${error}`);
+    console.error(`❌ Error in slack_get_channel_history: ${error}`);
     return {
       content: [
         {
           type: 'text',
-          text: `Error getting channel history: ${sanitizeErrorMessage(error)}`
+          text: `Error getting Slack channel history: ${sanitizeErrorMessage(error)}`
         }
       ]
     };
@@ -662,6 +675,74 @@ server.tool('create_channel', 'Create a new Slack channel. Use this to set up ne
         {
           type: 'text',
           text: `Error creating channel: ${sanitizeErrorMessage(error)}`
+        }
+      ]
+    };
+  }
+});
+
+// Slack Tool 5: Create channel
+server.tool('slack_create_channel', 'Create a new Slack channel. Use this to set up new discussion spaces.', {
+  name: z.string().describe('Name of the channel to create (without #)'),
+  isPrivate: z.boolean().optional().describe('Make the channel private (default: false)').default(false)
+}, async ({ name, isPrivate }, context) => {
+  try {
+    const organizationId = getOrganizationIdFromContext(context);
+    const sessionId = `${organizationId}-slack-create-${Date.now()}`;
+    
+    if (!checkToolCallLimit(sessionId)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Too many requests. Please wait a moment before trying again.'
+          }
+        ]
+      };
+    }
+
+    // Validate inputs
+    if (!name || name.trim().length === 0) {
+      throw new Error('Channel name is required');
+    }
+
+    if (name.length > 80) {
+      throw new Error('Channel name too long (max 80 characters)');
+    }
+
+    // Validate channel name format
+    if (!/^[a-z0-9-_]+$/.test(name)) {
+      throw new Error('Channel name can only contain lowercase letters, numbers, hyphens, and underscores');
+    }
+
+    console.log(`➕ Creating Slack channel ${name} for organization: ${organizationId}`);
+    
+    const client = await getOrganizationSlackClient(organizationId);
+    
+    const result = await client.conversations.create({
+      name,
+      is_private: isPrivate
+    });
+
+    if (result.ok) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `✅ Slack channel #${name} created successfully!\n\nChannel ID: ${result.channel?.id}\nPrivate: ${isPrivate ? 'Yes' : 'No'}\n\n💡 Tip: Use slack_send_message to post the first message in the new channel.`
+          }
+        ]
+      };
+    } else {
+      throw new Error(`Failed to create channel: ${result.error}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error in slack_create_channel: ${error}`);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Error creating Slack channel: ${sanitizeErrorMessage(error)}`
         }
       ]
     };
@@ -737,6 +818,75 @@ server.tool('invite_users_to_channel', 'Invite users to a Slack channel. Use thi
   }
 });
 
+// Slack Tool 6: Invite users to channel
+server.tool('slack_invite_users_to_channel', 'Invite users to a Slack channel. Use this to add team members to discussions.', {
+  channel: z.string().describe('Channel ID to invite users to'),
+  users: z.string().describe('Comma-separated list of user IDs to invite')
+}, async ({ channel, users }, context) => {
+  try {
+    const organizationId = getOrganizationIdFromContext(context);
+    const sessionId = `${organizationId}-slack-invite-${Date.now()}`;
+    
+    if (!checkToolCallLimit(sessionId)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Too many requests. Please wait a moment before trying again.'
+          }
+        ]
+      };
+    }
+
+    // Validate inputs
+    if (!channel) {
+      throw new Error('Channel ID is required');
+    }
+
+    if (!users || users.trim().length === 0) {
+      throw new Error('User IDs are required');
+    }
+
+    console.log(`👥 Inviting users to Slack channel ${channel} for organization: ${organizationId}`);
+    
+    const client = await getOrganizationSlackClient(organizationId);
+    
+    const userIds = users.split(',').map(id => id.trim()).filter(id => id.length > 0);
+    
+    if (userIds.length === 0) {
+      throw new Error('No valid user IDs provided');
+    }
+
+    const result = await client.conversations.invite({
+      channel,
+      users: userIds.join(',')
+    });
+
+    if (result.ok) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `✅ Successfully invited ${userIds.length} user(s) to Slack channel ${channel}!\n\nInvited users: ${userIds.join(', ')}`
+          }
+        ]
+      };
+    } else {
+      throw new Error(`Failed to invite users: ${result.error}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error in slack_invite_users_to_channel: ${error}`);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Error inviting users to Slack channel: ${sanitizeErrorMessage(error)}`
+        }
+      ]
+    };
+  }
+});
+
 // Tool 8: Get workspace info
 server.tool('get_workspace_info', 'Get information about the Slack workspace. Use this to understand the workspace structure.', {}, async (_, context) => {
   try {
@@ -795,6 +945,70 @@ Users: ${teamInfo.team?.members_count || 'Unknown'}
         {
           type: 'text',
           text: `Error getting workspace info: ${sanitizeErrorMessage(error)}`
+        }
+      ]
+    };
+  }
+});
+
+// Slack Tool 7: Get workspace info
+server.tool('slack_get_workspace_info', 'Get information about the Slack workspace. Use this to understand the workspace structure.', {}, async (_, context) => {
+  try {
+    const organizationId = getOrganizationIdFromContext(context);
+    const sessionId = `${organizationId}-slack-workspace-${Date.now()}`;
+    
+    if (!checkToolCallLimit(sessionId)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'Too many requests. Please wait a moment before trying again.'
+          }
+        ]
+      };
+    }
+
+    console.log(`🏢 Getting Slack workspace info for organization: ${organizationId}`);
+    
+    const client = await getOrganizationSlackClient(organizationId);
+    
+    const [teamInfo, authTest] = await Promise.all([
+      client.team.info(),
+      client.auth.test()
+    ]);
+
+    const workspaceInfo = `
+🏢 **Slack Workspace Information**
+Name: ${teamInfo.team?.name || 'Unknown'}
+Domain: ${teamInfo.team?.domain || 'Unknown'}
+Description: ${(teamInfo.team as any)?.description || 'No description'}
+Created: ${(teamInfo.team as any)?.date_created ? new Date(parseInt((teamInfo.team as any).date_created) * 1000).toLocaleDateString() : 'Unknown'}
+
+👤 **Current User**
+Name: ${authTest.user || 'Unknown'}
+Team: ${authTest.team || 'Unknown'}
+User ID: ${authTest.user_id || 'Unknown'}
+
+📊 **Workspace Stats**
+Channels: ${(teamInfo.team as any)?.channels_count || 'Unknown'}
+Users: ${(teamInfo.team as any)?.members_count || 'Unknown'}
+`;
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: workspaceInfo
+        }
+      ]
+    };
+  } catch (error) {
+    console.error(`❌ Error in slack_get_workspace_info: ${error}`);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Error getting Slack workspace info: ${sanitizeErrorMessage(error)}`
         }
       ]
     };
