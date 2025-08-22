@@ -6,6 +6,8 @@ import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
+console.log('🚀 Starting Slack MCP Server...');
+
 // Initialize MCP server
 const server = new McpServer(
   {
@@ -29,6 +31,9 @@ const userCache = new Map<string, any[]>();
 
 // Rate limiting
 const toolCallCounts = new Map<string, { count: number; timestamp: number }>();
+
+// Transport management for SSE sessions
+const transports: { [sessionId: string]: SSEServerTransport } = {};
 
 // Initialize Supabase
 async function initializeSupabase() {
@@ -752,35 +757,87 @@ async function startServer() {
       });
     });
 
-    // MCP endpoint - GET for SSE connection
-    app.get('/mcp', (req, res) => {
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+    // SSE endpoint for establishing the stream (official MCP endpoint)
+    app.get('/mcp', async (req, res) => {
+      console.log('📡 Received GET request to /mcp (establishing SSE stream)');
+      try {
+        // Create a new SSE transport for the client
+        const transport = new SSEServerTransport('/messages', res);
+        
+        // Store the transport by session ID
+        const sessionId = transport.sessionId;
+        transports[sessionId] = transport;
+        
+        // Set up onclose handler to clean up transport when closed
+        transport.onclose = () => {
+          console.log(`🗑️  SSE transport closed for session ${sessionId}`);
+          delete transports[sessionId];
+        };
+        
+        // Connect the transport to the MCP server
+        await server.connect(transport);
+        
+        console.log(`✅ Established SSE stream with session ID: ${sessionId}`);
+        
+        // Send a keep-alive every 30 seconds to maintain connection
+        const keepAliveInterval = setInterval(() => {
+          if (!res.destroyed) {
+            res.write(':\n\n');
+          } else {
+            clearInterval(keepAliveInterval);
+          }
+        }, 30000);
 
-      const transport = new SSEServerTransport(req as any, res as any);
-      server.connect(transport);
+        // Clean up interval when connection closes
+        req.on('close', () => {
+          clearInterval(keepAliveInterval);
+          console.log(`🔌 Client disconnected for session ${sessionId}`);
+        });
+        
+      } catch (error) {
+        console.error('❌ Error establishing SSE stream:', error);
+        if (!res.headersSent) {
+          res.status(500).send('Error establishing SSE stream');
+        }
+      }
     });
 
-    // MCP endpoint - POST for message handling
-    app.post('/mcp', (req, res) => {
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
-
-      const transport = new SSEServerTransport(req as any, res as any);
-      server.connect(transport);
+    // Messages endpoint for receiving client JSON-RPC requests (official MCP endpoint)
+    app.post('/messages', async (req, res) => {
+      console.log('📨 Received POST request to /messages');
+      
+      // Extract session ID from URL query parameter
+      const sessionId = req.query.sessionId as string;
+      if (!sessionId) {
+        console.error('❌ No session ID provided in request URL');
+        res.status(400).send('Missing sessionId parameter');
+        return;
+      }
+      
+      const transport = transports[sessionId];
+      if (!transport) {
+        console.error(`❌ No active transport found for session ID: ${sessionId}`);
+        res.status(404).send('Session not found');
+        return;
+      }
+      
+      try {
+        // Handle the POST message with the transport
+        await transport.handlePostMessage(req, res, req.body);
+      } catch (error) {
+        console.error('❌ Error handling request:', error);
+        if (!res.headersSent) {
+          res.status(500).send('Error handling request');
+        }
+      }
     });
 
     // Start the server
     app.listen(port, () => {
       console.log(`✅ Slack MCP Server running on port ${port}`);
-      console.log(`🔗 MCP endpoint: http://localhost:${port}/mcp`);
-      console.log(`💚 Health check: http://localhost:${port}/health`);
+      console.log(`🔗 Health check: http://localhost:${port}/health`);
+      console.log(`📡 MCP endpoint: http://localhost:${port}/mcp`);
+      console.log(`📨 Messages endpoint: http://localhost:${port}/messages`);
     });
 
   } catch (error) {
