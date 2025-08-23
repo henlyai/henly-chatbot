@@ -15,7 +15,7 @@ async function testMCPConnection(url) {
     logger.info(`[MCP] Testing connection to: ${url}`);
     
     // Test health endpoint first
-    const healthUrl = url.replace('/sse', '/health');
+    const healthUrl = url.replace('/mcp', '/health');
     const healthResponse = await fetch(healthUrl, { 
       method: 'GET',
       timeout: 5000 
@@ -28,12 +28,12 @@ async function testMCPConnection(url) {
     
     logger.info(`[MCP] Health check passed: ${healthResponse.status}`);
     
-    // Test SSE endpoint with a timeout
+    // Test MCP endpoint with a timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
     
     try {
-      const sseResponse = await fetch(url, {
+      const mcpResponse = await fetch(url, {
         method: 'GET',
         headers: {
           'Accept': 'text/event-stream',
@@ -44,20 +44,20 @@ async function testMCPConnection(url) {
       
       clearTimeout(timeoutId);
       
-      if (!sseResponse.ok) {
-        logger.error(`[MCP] SSE connection failed: ${sseResponse.status} ${sseResponse.statusText}`);
+      if (!mcpResponse.ok) {
+        logger.error(`[MCP] MCP connection failed: ${mcpResponse.status} ${mcpResponse.statusText}`);
         return false;
       }
       
-      logger.info(`[MCP] SSE connection successful: ${sseResponse.status}`);
+      logger.info(`[MCP] MCP connection successful: ${mcpResponse.status}`);
       return true;
       
     } catch (error) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
-        logger.error(`[MCP] SSE connection timeout after 10 seconds`);
+        logger.error(`[MCP] MCP connection timeout after 10 seconds`);
       } else {
-        logger.error(`[MCP] SSE connection error: ${error.message}`);
+        logger.error(`[MCP] MCP connection error: ${error.message}`);
       }
       return false;
     }
