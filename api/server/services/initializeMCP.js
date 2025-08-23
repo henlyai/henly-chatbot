@@ -83,13 +83,23 @@ async function initializeMCP(app) {
   logger.info(`[MCP] Server names: ${Object.keys(mcpServers).join(', ')}`);
   
   // Test connections before initialization
+  const reachableServers = {};
   for (const [serverName, config] of Object.entries(mcpServers)) {
     const isReachable = await testMCPConnection(config.url);
     if (!isReachable) {
-      logger.error(`[MCP] Cannot reach ${serverName} at ${config.url} - skipping initialization`);
-      return;
+      logger.error(`[MCP] Cannot reach ${serverName} at ${config.url} - skipping this server`);
+      continue;
     }
+    reachableServers[serverName] = config;
+    logger.info(`[MCP] ${serverName} connection test passed`);
   }
+  
+  if (Object.keys(reachableServers).length === 0) {
+    logger.error('[MCP] No MCP servers are reachable - skipping initialization');
+    return;
+  }
+  
+  logger.info(`[MCP] Proceeding with ${Object.keys(reachableServers).length} reachable MCP servers`);
   
   const mcpManager = getMCPManager();
   const flowsCache = getLogStores(CacheKeys.FLOWS);
@@ -98,7 +108,7 @@ async function initializeMCP(app) {
   try {
     logger.info('[MCP] Starting MCP manager initialization...');
     await mcpManager.initializeMCP({
-      mcpServers,
+      mcpServers: reachableServers,
       flowManager,
       tokenMethods: {
         findToken,
