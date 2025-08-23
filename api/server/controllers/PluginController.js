@@ -54,7 +54,24 @@ const getAvailablePluginsController = async (req, res) => {
   try {
     const cache = getLogStores(CacheKeys.CONFIG_STORE);
     const cachedPlugins = await cache.get(CacheKeys.PLUGINS);
-    if (cachedPlugins) {
+    
+    // Check if we have MCP configuration that needs to be loaded
+    const customConfig = await getCustomConfig();
+    const mcpConfig = customConfig?.mcpServers ?? req.app.locals?.mcpConfig;
+    
+    // If we have MCP config, always reload plugins to ensure MCPs are included
+    if (mcpConfig && cachedPlugins) {
+      console.log('🔍 [PluginController] MCP config detected, bypassing cache to reload plugins');
+      const mcpPlugins = cachedPlugins.filter(p => p.pluginKey && p.pluginKey.includes(Constants.mcp_delimiter));
+      console.log('🔍 [PluginController] Current cached MCP plugins:', mcpPlugins.length);
+      
+      // If no MCP plugins in cache, force reload
+      if (mcpPlugins.length === 0) {
+        console.log('🔍 [PluginController] No MCP plugins in cache, forcing reload');
+      } else {
+        console.log('🔍 [PluginController] MCP plugins found in cache, but reloading to ensure freshness');
+      }
+    } else if (cachedPlugins) {
       console.log('🔍 [PluginController] Returning cached plugins:', cachedPlugins.length);
       const mcpPlugins = cachedPlugins.filter(p => p.pluginKey && p.pluginKey.includes(Constants.mcp_delimiter));
       console.log('🔍 [PluginController] Cached MCP plugins:', mcpPlugins.length);
@@ -69,10 +86,7 @@ const getAvailablePluginsController = async (req, res) => {
     console.log('🔍 [PluginController] Starting with static tools:', pluginManifest.length);
     console.log('🔍 [PluginController] Static tool keys:', pluginManifest.map(p => p.pluginKey).slice(0, 5));
 
-    // Load MCP tools if MCP configuration is available
-    const customConfig = await getCustomConfig();
-    const mcpConfig = customConfig?.mcpServers ?? req.app.locals?.mcpConfig;
-    
+    // MCP config already loaded above, use it here
     console.log('🔍 [PluginController] MCP config found:', !!mcpConfig);
     if (mcpConfig) {
       console.log('🔍 [PluginController] MCP config keys:', Object.keys(mcpConfig));
