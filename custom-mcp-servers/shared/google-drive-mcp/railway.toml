@@ -11,11 +11,11 @@ numReplicas = 1
 
 [deploy.variables]
 NODE_ENV = "production"
-PORT = "3001"
+PORT = "8080"
 MCP_TRANSPORT = "sse"
 
 [deploy.healthcheck]
-port = 3001
+port = 8080
 path = "/health"
 timeout = 30
 interval = 10

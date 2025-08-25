@@ -759,7 +759,7 @@ console.log('✅ Express app setup complete');
 
 // Start the server
 async function start() {
-  const port = process.env.PORT || 3001;
+  const port = process.env.PORT || 8080;
   
   console.log(`🚀 Starting server on port ${port}...`);
   
