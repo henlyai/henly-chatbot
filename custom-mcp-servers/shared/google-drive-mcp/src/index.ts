@@ -611,6 +611,11 @@ server.tool('read_content', 'Read the content of a file from Google Drive. Use t
 });
 
 console.log('✅ MCP tools registered with performance improvements');
+console.log('🛠️  Registered tools:');
+console.log('  • search_file - Search for files in Google Drive');
+console.log('  • list_files - List files and folders in Google Drive');
+console.log('  • get_file_metadata - Get detailed metadata for a file');
+console.log('  • read_content - Read the content of a file from Google Drive');
 
 // Express app setup
 console.log('🌐 Setting up Express app...');
@@ -683,12 +688,19 @@ app.get('/config/:organizationId', async (req, res) => {
 // SSE endpoint for establishing the stream (official MCP endpoint)
 app.get('/mcp', async (req, res) => {
   console.log('📡 Received GET request to /mcp (establishing SSE stream)');
+  console.log('🔍 Request headers:', JSON.stringify(req.headers, null, 2));
+  console.log('🔍 Request query:', JSON.stringify(req.query, null, 2));
+  console.log('🔍 Request URL:', req.url);
+  
   try {
+    console.log('🛠️  Creating SSEServerTransport...');
     // Create a new SSE transport for the client
     const transport = new SSEServerTransport('/messages', res);
+    console.log('✅ SSEServerTransport created successfully');
     
     // Store the transport by session ID
     const sessionId = transport.sessionId;
+    console.log(`🔍 Generated session ID: ${sessionId}`);
     transports[sessionId] = transport;
     
     // Set up onclose handler to clean up transport when closed
@@ -697,8 +709,10 @@ app.get('/mcp', async (req, res) => {
       delete transports[sessionId];
     };
     
+    console.log('🔗 Connecting transport to MCP server...');
     // Connect the transport to the MCP server
     await server.connect(transport);
+    console.log('✅ Transport connected to MCP server successfully');
     
     console.log(`✅ Established SSE stream with session ID: ${sessionId}`);
     
@@ -719,6 +733,12 @@ app.get('/mcp', async (req, res) => {
     
   } catch (error) {
     console.error('❌ Error establishing SSE stream:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code
+    });
     if (!res.headersSent) {
       res.status(500).send('Error establishing SSE stream');
     }
