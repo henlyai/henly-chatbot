@@ -611,8 +611,20 @@ export class MCPManager {
     flowManager: FlowStateManager<MCPOAuthTokens | null>;
     skipReconnect?: boolean;
   }): Promise<boolean> {
+    // First try the ping check
     if (await connection.isConnected()) {
       return true;
+    }
+
+    // If ping fails, try to fetch tools directly to see if the connection actually works
+    try {
+      const tools = await connection.fetchTools();
+      if (tools && tools.length > 0) {
+        logger.info(`[MCP][${serverName}] Connection ping failed but tools fetch successful, considering connection active`);
+        return true;
+      }
+    } catch (toolError) {
+      logger.debug(`[MCP][${serverName}] Tools fetch also failed: ${toolError}`);
     }
 
     if (skipReconnect) {
