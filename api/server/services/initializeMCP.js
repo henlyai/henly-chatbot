@@ -16,17 +16,30 @@ async function testMCPConnection(url) {
     
     // Test health endpoint first
     const healthUrl = url.replace('/mcp', '/health');
-    const healthResponse = await fetch(healthUrl, { 
-      method: 'GET',
-      timeout: 5000 
-    });
+    logger.info(`[MCP] Health check URL: ${healthUrl}`);
     
-    if (!healthResponse.ok) {
-      logger.error(`[MCP] Health check failed: ${healthResponse.status} ${healthResponse.statusText}`);
+    try {
+      const healthResponse = await fetch(healthUrl, { 
+        method: 'GET',
+        timeout: 5000 
+      });
+      
+      logger.info(`[MCP] Health response status: ${healthResponse.status}`);
+      logger.info(`[MCP] Health response headers: ${JSON.stringify(Object.fromEntries(healthResponse.headers.entries()))}`);
+      
+      if (!healthResponse.ok) {
+        const responseText = await healthResponse.text();
+        logger.error(`[MCP] Health check failed: ${healthResponse.status} ${healthResponse.statusText}`);
+        logger.error(`[MCP] Health response body: ${responseText}`);
+        return false;
+      }
+      
+      logger.info(`[MCP] Health check passed: ${healthResponse.status}`);
+    } catch (healthError) {
+      logger.error(`[MCP] Health check error: ${healthError.message}`);
+      logger.error(`[MCP] Health check stack: ${healthError.stack}`);
       return false;
     }
-    
-    logger.info(`[MCP] Health check passed: ${healthResponse.status}`);
     
     // Test MCP endpoint with a shorter timeout for SSE connections
     const controller = new AbortController();
