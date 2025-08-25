@@ -616,16 +616,22 @@ export class MCPManager {
       return true;
     }
 
-    // If ping fails, try to fetch tools directly to see if the connection actually works
-    try {
-      const tools = await connection.fetchTools();
-      if (tools && tools.length > 0) {
-        logger.info(`[MCP][${serverName}] Connection ping failed but tools fetch successful, considering connection active`);
-        return true;
+          // If ping fails, try to fetch tools directly to see if the connection actually works
+      try {
+        logger.info(`[MCP][${serverName}] Ping failed, attempting to fetch tools directly...`);
+        const tools = await connection.fetchTools();
+        logger.info(`[MCP][${serverName}] Tools fetch result: ${tools ? tools.length : 0} tools`);
+        if (tools && tools.length > 0) {
+          logger.info(`[MCP][${serverName}] Connection ping failed but tools fetch successful, considering connection active`);
+          tools.forEach(tool => {
+            logger.debug(`[MCP][${serverName}] Tool: ${tool.name} - ${tool.description}`);
+          });
+          return true;
+        }
+      } catch (toolError) {
+        logger.error(`[MCP][${serverName}] Tools fetch also failed: ${toolError.message}`);
+        logger.debug(`[MCP][${serverName}] Tools fetch error details:`, toolError);
       }
-    } catch (toolError) {
-      logger.debug(`[MCP][${serverName}] Tools fetch also failed: ${toolError}`);
-    }
 
     if (skipReconnect) {
       logger.warn(
