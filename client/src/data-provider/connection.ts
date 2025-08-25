@@ -27,8 +27,8 @@ export const useHealthCheck = (isAuthenticated = false) => {
         try {
           await queryClient.fetchQuery([QueryKeys.health], () => dataService.healthCheck(), {
             retry: false,
-            cacheTime: 0,
-            staleTime: 0,
+            cacheTime: Time.FIVE_MINUTES, // Cache for 5 minutes instead of immediate invalidation
+            staleTime: Time.TWO_MINUTES,  // Consider fresh for 2 minutes
           });
         } catch (error) {
           console.error('Health check failed:', error);
@@ -41,24 +41,28 @@ export const useHealthCheck = (isAuthenticated = false) => {
       // Set up interval for recurring checks
       intervalRef.current = setInterval(performHealthCheck, Time.TEN_MINUTES);
 
-      // Set up window focus handler
+      // Set up window focus handler - only check if been away for a significant time
       const handleWindowFocus = async () => {
         const queryState = queryClient.getQueryState([QueryKeys.health]);
 
-        if (!queryState?.dataUpdatedAt) {
-          await performHealthCheck();
-          return;
+        // Don't run health check on focus if we have recent data
+        if (queryState?.dataUpdatedAt) {
+          const lastUpdated = new Date(queryState.dataUpdatedAt);
+          const thirtyMinutesAgo = new Date(Date.now() - Time.THIRTY_MINUTES);
+
+          logger.log(`Last health check: ${lastUpdated.toISOString()}`);
+          logger.log(`Thirty minutes ago: ${thirtyMinutesAgo.toISOString()}`);
+
+          // Only check if health data is older than 30 minutes (instead of 10)
+          if (lastUpdated >= thirtyMinutesAgo) {
+            logger.log('Health check skipped - recent data available');
+            return;
+          }
         }
 
-        const lastUpdated = new Date(queryState.dataUpdatedAt);
-        const tenMinutesAgo = new Date(Date.now() - Time.TEN_MINUTES);
-
-        logger.log(`Last health check: ${lastUpdated.toISOString()}`);
-        logger.log(`Ten minutes ago: ${tenMinutesAgo.toISOString()}`);
-
-        if (lastUpdated < tenMinutesAgo) {
-          await performHealthCheck();
-        }
+        // Only perform health check if we have stale data or no data
+        logger.log('Performing health check on window focus');
+        await performHealthCheck();
       };
 
       // Store handler for cleanup
