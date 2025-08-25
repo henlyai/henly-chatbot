@@ -93,7 +93,7 @@ class OrganizationMCPService {
     return {
       "Google Drive": {
         type: "sse",
-        url: "https://mcp-servers-production-c189.up.railway.app/sse",
+        url: "https://mcp-servers-production-c189.up.railway.app/mcp",
         timeout: 60000,
         oauth: {
           authorization_url: "https://accounts.google.com/o/oauth2/auth",
