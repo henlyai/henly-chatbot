@@ -48,33 +48,38 @@ const AuthContextProvider = ({
 
   const navigate = useNavigate();
 
-  const setUserContext = useMemo(
-    () =>
-      debounce((userContext: TUserContext) => {
-        const { token, isAuthenticated, user, redirect } = userContext;
-        setUser(user);
-        setToken(token);
-        //@ts-ignore - ok for token to be undefined initially
-        setTokenHeader(token);
-        setIsAuthenticated(isAuthenticated);
+  // Create stable ref for setUserContext to prevent infinite loops
+  const setUserContextRef = useRef<((userContext: TUserContext) => void) | null>(null);
 
-        // Use a custom redirect if set
-        const finalRedirect = logoutRedirectRef.current || redirect;
-        // Clear the stored redirect
-        logoutRedirectRef.current = undefined;
+  const setUserContext = useCallback(
+    debounce((userContext: TUserContext) => {
+      const { token, isAuthenticated, user, redirect } = userContext;
+      setUser(user);
+      setToken(token);
+      //@ts-ignore - ok for token to be undefined initially
+      setTokenHeader(token);
+      setIsAuthenticated(isAuthenticated);
 
-        if (finalRedirect == null) {
-          return;
-        }
+      // Use a custom redirect if set
+      const finalRedirect = logoutRedirectRef.current || redirect;
+      // Clear the stored redirect
+      logoutRedirectRef.current = undefined;
 
-        if (finalRedirect.startsWith('http://') || finalRedirect.startsWith('https://')) {
-          window.location.href = finalRedirect;
-        } else {
-          navigate(finalRedirect, { replace: true });
-        }
-      }, 50),
-    [navigate, setUser],
+      if (finalRedirect == null) {
+        return;
+      }
+
+      if (finalRedirect.startsWith('http://') || finalRedirect.startsWith('https://')) {
+        window.location.href = finalRedirect;
+      } else {
+        navigate(finalRedirect, { replace: true });
+      }
+    }, 50),
+    [navigate, setUser, setToken, setIsAuthenticated]
   );
+
+  // Store stable ref
+  setUserContextRef.current = setUserContext;
   const doSetError = useTimeout({ callback: (error) => setError(error as string | undefined) });
 
   const loginUser = useLoginUserMutation({
@@ -131,6 +136,9 @@ const AuthContextProvider = ({
     loginUser.mutate(data);
   };
 
+  // Create stable refs to break infinite dependency cycles
+  const silentRefreshRef = useRef<(() => void) | null>(null);
+
   const silentRefresh = useCallback(() => {
     if (authConfig?.test === true) {
       console.log('Test mode. Skipping silent refresh.');
@@ -172,7 +180,10 @@ const AuthContextProvider = ({
         }
       },
     });
-  }, []);
+  }, [refreshToken, setUserContext, navigate, authConfig]);
+
+  // Store stable ref 
+  silentRefreshRef.current = silentRefresh;
 
   useEffect(() => {
     if (userQuery.data) {
@@ -185,7 +196,8 @@ const AuthContextProvider = ({
       doSetError(undefined);
     }
     if (token == null || !token || !isAuthenticated) {
-      silentRefresh();
+      // Use stable ref to prevent infinite dependency cycles
+      silentRefreshRef.current?.();
     }
   }, [
     token,
@@ -196,8 +208,7 @@ const AuthContextProvider = ({
     error,
     setUser,
     navigate,
-    silentRefresh,
-    setUserContext,
+    // Removed silentRefresh and setUserContext from deps to break cycle
   ]);
 
   useEffect(() => {
