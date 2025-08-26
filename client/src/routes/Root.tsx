@@ -20,6 +20,7 @@ import { Nav, MobileNav } from '~/components/Nav';
 import { useHealthCheck } from '~/data-provider';
 import { Banner } from '~/components/Banners';
 import { useDebugReactLifecycle } from '~/hooks/useDebugReactLifecycle';
+import { useIframeDetection } from '~/hooks/useIframeDetection';
 
 export default function Root() {
   const [showTerms, setShowTerms] = useState(false);
@@ -31,11 +32,14 @@ export default function Root() {
 
   const { isAuthenticated, logout } = useAuthContext();
 
+  // Test iframe detection (Step 1)
+  const { isInIframe, parentOrigin } = useIframeDetection();
+
   // Debug React lifecycle to understand what's causing re-renders
   useDebugReactLifecycle({
     componentName: 'Root',
     trackProps: { isAuthenticated },
-    trackState: { showTerms, bannerHeight, navVisible },
+    trackState: { showTerms, bannerHeight, navVisible, isInIframe },
     trackDeps: [isAuthenticated]
   });
 
