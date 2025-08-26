@@ -147,7 +147,14 @@ const AuthContextProvider = ({
           if (authConfig?.test === true) {
             return;
           }
-          navigate('/login');
+          // In iframe context, avoid navigation which can cause refresh-like behavior
+          const isInIframe = window !== window.top;
+          if (isInIframe) {
+            // Notify parent window instead of navigating
+            window.parent.postMessage({ type: 'auth_required' }, '*');
+          } else {
+            navigate('/login');
+          }
         }
       },
       onError: (error) => {
@@ -155,7 +162,14 @@ const AuthContextProvider = ({
         if (authConfig?.test === true) {
           return;
         }
-        navigate('/login');
+        // In iframe context, avoid navigation which can cause refresh-like behavior
+        const isInIframe = window !== window.top;
+        if (isInIframe) {
+          // Notify parent window instead of navigating
+          window.parent.postMessage({ type: 'auth_required' }, '*');
+        } else {
+          navigate('/login');
+        }
       },
     });
   }, []);

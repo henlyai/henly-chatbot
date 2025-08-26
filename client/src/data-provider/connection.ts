@@ -41,33 +41,57 @@ export const useHealthCheck = (isAuthenticated = false) => {
       // Set up interval for recurring checks
       intervalRef.current = setInterval(performHealthCheck, Time.TEN_MINUTES);
 
-      // Set up window focus handler - only check if been away for a significant time
-      const handleWindowFocus = async () => {
-        const queryState = queryClient.getQueryState([QueryKeys.health]);
-
-        // Don't run health check on focus if we have recent data
-        if (queryState?.dataUpdatedAt) {
-          const lastUpdated = new Date(queryState.dataUpdatedAt);
-          const thirtyMinutesAgo = new Date(Date.now() - Time.THIRTY_MINUTES);
-
-          logger.log(`Last health check: ${lastUpdated.toISOString()}`);
-          logger.log(`Thirty minutes ago: ${thirtyMinutesAgo.toISOString()}`);
-
-          // Only check if health data is older than 30 minutes (instead of 10)
-          if (lastUpdated >= thirtyMinutesAgo) {
-            logger.log('Health check skipped - recent data available');
+      // Detect if we're running in an iframe
+      const isInIframe = window !== window.top;
+      
+      if (isInIframe) {
+        // For iframe context, use document visibility API instead of window focus
+        // This is more reliable and less aggressive for embedded content
+        const handleVisibilityChange = async () => {
+          // Only check when becoming visible, not when hiding
+          if (document.hidden) {
             return;
           }
-        }
 
-        // Only perform health check if we have stale data or no data
-        logger.log('Performing health check on window focus');
-        await performHealthCheck();
-      };
+          const queryState = queryClient.getQueryState([QueryKeys.health]);
+          
+          // For iframe, be more conservative - only check if data is very stale (1 hour)
+          if (queryState?.dataUpdatedAt) {
+            const lastUpdated = new Date(queryState.dataUpdatedAt);
+            const oneHourAgo = new Date(Date.now() - Time.ONE_HOUR);
+            
+            if (lastUpdated >= oneHourAgo) {
+              return; // Skip if data is less than 1 hour old
+            }
+          }
 
-      // Store handler for cleanup
-      focusHandlerRef.current = handleWindowFocus;
-      window.addEventListener('focus', handleWindowFocus);
+          await performHealthCheck();
+        };
+
+        focusHandlerRef.current = handleVisibilityChange;
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+      } else {
+        // Standard window focus behavior for non-iframe context
+        const handleWindowFocus = async () => {
+          const queryState = queryClient.getQueryState([QueryKeys.health]);
+
+          // Don't run health check on focus if we have recent data
+          if (queryState?.dataUpdatedAt) {
+            const lastUpdated = new Date(queryState.dataUpdatedAt);
+            const thirtyMinutesAgo = new Date(Date.now() - Time.THIRTY_MINUTES);
+
+            // Only check if health data is older than 30 minutes
+            if (lastUpdated >= thirtyMinutesAgo) {
+              return;
+            }
+          }
+
+          await performHealthCheck();
+        };
+
+        focusHandlerRef.current = handleWindowFocus;
+        window.addEventListener('focus', handleWindowFocus);
+      }
     }, 500);
 
     return () => {
@@ -76,9 +100,14 @@ export const useHealthCheck = (isAuthenticated = false) => {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-      // Remove focus event listener if it was added
+      // Remove event listener if it was added
       if (focusHandlerRef.current) {
-        window.removeEventListener('focus', focusHandlerRef.current);
+        const isInIframe = window !== window.top;
+        if (isInIframe) {
+          document.removeEventListener('visibilitychange', focusHandlerRef.current);
+        } else {
+          window.removeEventListener('focus', focusHandlerRef.current);
+        }
         focusHandlerRef.current = null;
       }
     };
