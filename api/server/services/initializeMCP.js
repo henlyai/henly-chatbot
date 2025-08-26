@@ -14,8 +14,8 @@ async function testMCPConnection(url) {
   try {
     logger.info(`[MCP] Testing connection to: ${url}`);
     
-    // Test health endpoint first
-    const healthUrl = url.replace('/mcp', '/health');
+    // Test health endpoint first  
+    const healthUrl = url.endsWith('/mcp') ? url.slice(0, -4) + '/health' : url.replace(/\/mcp$/, '/health');
     logger.info(`[MCP] Health check URL: ${healthUrl}`);
     
     try {
