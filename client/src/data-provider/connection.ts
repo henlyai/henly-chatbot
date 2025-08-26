@@ -51,32 +51,13 @@ export const useHealthCheck = (isAuthenticated = false) => {
       // Detect if we're running in an iframe
       const isInIframe = window !== window.top;
       
+      console.log(`🖼️ [HealthCheck] Step 2B: Iframe context detected:`, isInIframe);
+      
       if (isInIframe) {
-        // For iframe context, use document visibility API instead of window focus
-        // This is more reliable and less aggressive for embedded content
-        const handleVisibilityChange = async () => {
-          // Only check when becoming visible, not when hiding
-          if (document.hidden) {
-            return;
-          }
-
-          const queryState = queryClient.getQueryState([QueryKeys.health]);
-          
-          // For iframe, be more conservative - only check if data is very stale (1 hour)
-          if (queryState?.dataUpdatedAt) {
-            const lastUpdated = new Date(queryState.dataUpdatedAt);
-            const oneHourAgo = new Date(Date.now() - Time.ONE_HOUR);
-            
-            if (lastUpdated >= oneHourAgo) {
-              return; // Skip if data is less than 1 hour old
-            }
-          }
-
-          await performHealthCheck();
-        };
-
-        focusHandlerRef.current = handleVisibilityChange;
-        document.addEventListener('visibilitychange', handleVisibilityChange);
+        // STEP 2B: Completely disable health check in iframe context to prevent refresh
+        console.log(`📱 [HealthCheck] Disabling health check in iframe context to prevent refresh`);
+        // Do nothing - no event listeners, no health checks
+        return;
       } else {
         // Standard window focus behavior for non-iframe context
         const handleWindowFocus = async () => {
