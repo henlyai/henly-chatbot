@@ -7,12 +7,21 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-query';
 import { ScreenshotProvider, ThemeProvider, useApiErrorBoundary } from './hooks';
 import { ToastProvider } from './Providers';
+import { useDebugReactLifecycle } from './hooks/useDebugReactLifecycle';
 import Toast from './components/ui/Toast';
 import { LiveAnnouncer } from '~/a11y';
 import { router } from './routes';
 
 const App = () => {
   const { setError } = useApiErrorBoundary();
+
+  // Debug React lifecycle to understand what's causing App re-renders
+  useDebugReactLifecycle({
+    componentName: 'App',
+    trackProps: {},
+    trackState: {},
+    trackDeps: []
+  });
 
   const queryClient = new QueryClient({
     queryCache: new QueryCache({

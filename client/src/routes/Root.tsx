@@ -19,6 +19,7 @@ import { useUserTermsQuery, useGetStartupConfig } from '~/data-provider';
 import { Nav, MobileNav } from '~/components/Nav';
 import { useHealthCheck } from '~/data-provider';
 import { Banner } from '~/components/Banners';
+import { useDebugReactLifecycle } from '~/hooks/useDebugReactLifecycle';
 
 export default function Root() {
   const [showTerms, setShowTerms] = useState(false);
@@ -29,6 +30,14 @@ export default function Root() {
   });
 
   const { isAuthenticated, logout } = useAuthContext();
+
+  // Debug React lifecycle to understand what's causing re-renders
+  useDebugReactLifecycle({
+    componentName: 'Root',
+    trackProps: { isAuthenticated },
+    trackState: { showTerms, bannerHeight, navVisible },
+    trackDeps: [isAuthenticated]
+  });
 
   // Global health check - runs once per authenticated session
   useHealthCheck(isAuthenticated);

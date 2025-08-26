@@ -10,8 +10,15 @@ export const useHealthCheck = (isAuthenticated = false) => {
   const focusHandlerRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
+    console.log(`🏥 [HealthCheck] useEffect triggered:`, {
+      isAuthenticated,
+      isInitialized: isInitialized.current,
+      timestamp: new Date().toISOString()
+    });
+
     // Only start health check if authenticated
     if (!isAuthenticated) {
+      console.log(`🔒 [HealthCheck] Skipping - not authenticated`);
       return;
     }
 
