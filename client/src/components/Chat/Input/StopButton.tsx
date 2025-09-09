@@ -11,8 +11,9 @@ export default function StopButton({ stop, setShowStopButton }) {
       render={
         <button
           type="button"
+          style={{ backgroundColor: '#595F39' }}
           className={cn(
-            'rounded-full bg-text-primary p-1.5 text-text-primary outline-offset-4 transition-all duration-200 disabled:cursor-not-allowed disabled:text-text-secondary disabled:opacity-10',
+            'rounded-full p-1.5 text-text-primary outline-offset-4 transition-all duration-200 disabled:cursor-not-allowed disabled:text-text-secondary disabled:opacity-10',
           )}
           aria-label={localize('com_nav_stop_generating')}
           onClick={(e) => {
