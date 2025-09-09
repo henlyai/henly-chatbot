@@ -10,7 +10,8 @@ RUN apk add --no-cache \
     make \
     g++ \
     git \
-    curl
+    curl \
+    vips-dev
 
 # Copy package files first for better caching
 COPY package*.json ./
@@ -21,13 +22,16 @@ COPY packages/data-schemas/package*.json ./packages/data-schemas/
 COPY packages/api/package*.json ./packages/api/
 
 # Install ALL dependencies (including dev dependencies for build)
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source code
 COPY . .
 
 # Use the librechat.yaml from the repository (not hardcoded)
 RUN echo "Using librechat.yaml from repository:" && ls -la /app/librechat.yaml && cat /app/librechat.yaml
+
+# Fix Rollup platform binary issue for Railway (x64)
+RUN npm install @rollup/rollup-linux-x64-musl --no-save --ignore-scripts
 
 # Build the application
 RUN npm run build:data-provider
@@ -50,4 +54,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=5 \
     CMD curl -f http://localhost:8080/health || exit 1
 
 # Start the application
-CMD ["/start.sh"] 
+CMD ["/start.sh"]
