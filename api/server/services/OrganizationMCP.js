@@ -17,6 +17,7 @@ class OrganizationMCPService {
   async getOrganizationMCPServers(organizationId) {
     try {
       logger.info(`[OrganizationMCP] Fetching MCP servers for organization: ${organizationId}`);
+      console.log(`🔍 [OrganizationMCP] Fetching MCP servers for organization: ${organizationId}`);
       
       // Log the environment variables to verify they're set
       logger.info(`[OrganizationMCP] SUPABASE_URL: ${process.env.SUPABASE_URL ? 'SET' : 'NOT SET'}`);
@@ -35,6 +36,8 @@ class OrganizationMCPService {
 
       logger.info(`[OrganizationMCP] Raw Supabase result for ${organizationId}: ${JSON.stringify(mcpServers)}`);
       logger.info(`[OrganizationMCP] Found ${mcpServers ? mcpServers.length : 0} MCP servers in database`);
+      console.log(`🔍 [OrganizationMCP] Found ${mcpServers ? mcpServers.length : 0} MCP servers in database`);
+      console.log(`🔍 [OrganizationMCP] MCP names:`, mcpServers ? mcpServers.map(m => m.name) : []);
 
       // Convert to LibreChat format
       const librechatConfig = {};

@@ -19,15 +19,6 @@ const jwtLogin = () =>
             user.role = SystemRoles.USER;
             await updateUser(user.id, { role: user.role });
           }
-          
-          // Extract organization_id from JWT payload if available
-          if (payload?.organization?.id) {
-            user.organization_id = payload.organization.id;
-            logger.info(`[jwtLogin] Added organization_id to user: ${user.organization_id}`);
-          } else {
-            logger.warn('[jwtLogin] No organization_id found in JWT payload');
-          }
-          
           done(null, user);
         } else {
           logger.warn('[jwtLogin] JwtStrategy => no user found: ' + payload?.id);
