@@ -104,10 +104,16 @@ router.get('/', async function (req, res) {
     const mcpService = new OrganizationMCPService();
     
     // Get user from request (you may need to adjust this based on your auth setup)
+    console.log("[CONFIG DEBUG] req.user:", req.user);
+    console.log("[CONFIG DEBUG] DEFAULT_ORGANIZATION_ID:", process.env.DEFAULT_ORGANIZATION_ID);
     const user = req.user || { organization_id: process.env.DEFAULT_ORGANIZATION_ID };
+    
+    console.log("[CONFIG DEBUG] Final user object:", user);
     
     // Get MCP configuration from Supabase
     const mcpConfig = await mcpService.getUserMCPConfig(user);
+    console.log("[CONFIG DEBUG] MCP config returned:", mcpConfig);
+    console.log("[CONFIG DEBUG] MCP config keys:", mcpConfig ? Object.keys(mcpConfig) : "null");
     
     payload.mcpServers = {};
     if (mcpConfig && Object.keys(mcpConfig).length > 0) {
