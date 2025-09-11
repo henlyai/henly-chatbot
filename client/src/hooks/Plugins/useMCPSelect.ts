@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useRecoilState } from 'recoil';
 import { Constants, LocalStorageKeys, EModelEndpoint } from 'librechat-data-provider';
 import type { TPlugin } from 'librechat-data-provider';
-import { useAvailableToolsQuery } from '~/data-provider';
+import { useAvailableToolsQuery, useGetStartupConfig } from '~/data-provider';
 import useLocalStorage from '~/hooks/useLocalStorageAlt';
 import { ephemeralAgentByConvoId } from '~/store';
 
@@ -28,6 +28,8 @@ export function useMCPSelect({ conversationId }: UseMCPSelectOptions) {
   const key = conversationId ?? Constants.NEW_CONVO;
   const hasSetFetched = useRef<string | null>(null);
   const [ephemeralAgent, setEphemeralAgent] = useRecoilState(ephemeralAgentByConvoId(key));
+  const { data: startupConfig } = useGetStartupConfig();
+  
   const { data: mcpToolDetails, isFetched } = useAvailableToolsQuery(EModelEndpoint.agents, {
     select: (data: TPlugin[]) => {
       const mcpToolsMap = new Map<string, TPlugin>();
@@ -97,9 +99,23 @@ export function useMCPSelect({ conversationId }: UseMCPSelectOptions) {
     setMCPValues([]);
   }, [isFetched, setMCPValues, mcpToolDetails, key, mcpValues]);
 
+  // Modified to show all MCPs from startupConfig, not just those with tools
   const mcpServerNames = useMemo(() => {
-    return (mcpToolDetails ?? []).map((tool) => tool.name);
-  }, [mcpToolDetails]);
+    // Get all MCP server names from startupConfig
+    const configMCPs = startupConfig?.mcpServers ? Object.keys(startupConfig.mcpServers) : [];
+    
+    // Get MCP server names from available tools (for backward compatibility)
+    const toolMCPs = (mcpToolDetails ?? []).map((tool) => tool.name);
+    
+    // Combine both lists and remove duplicates
+    const allMCPs = [...new Set([...configMCPs, ...toolMCPs])];
+    
+    console.log('🔍 [useMCPSelect] All MCPs from config:', configMCPs);
+    console.log('🔍 [useMCPSelect] MCPs from tools:', toolMCPs);
+    console.log('🔍 [useMCPSelect] Combined MCPs:', allMCPs);
+    
+    return allMCPs;
+  }, [startupConfig?.mcpServers, mcpToolDetails]);
 
   return {
     isPinned,
