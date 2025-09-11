@@ -1,4 +1,4 @@
-# Google Drive MCP Server for ScaleWize AI
+# Google Drive MCP Server for Henly AI
 
 A custom Model Context Protocol (MCP) server that provides comprehensive Google Drive integration for LibreChat, enabling AI assistants to read, search, and manage Google Drive files.
 

@@ -18,7 +18,7 @@
     "model-context-protocol",
     "librechat"
   ],
-  "author": "ScaleWize AI",
+  "author": "Henly AI",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.3",

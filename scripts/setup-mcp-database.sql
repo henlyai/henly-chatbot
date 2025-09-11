@@ -1,11 +1,11 @@
--- Setup MCP Servers for ScaleWize AI
+-- Setup MCP Servers for Henly AI
 -- This script sets up the mcp_servers table with sample data
 
 -- Insert sample organization (if not exists)
 INSERT INTO public.organizations (id, name, domain, subscription_status, plan_type)
 VALUES (
   '550e8400-e29b-41d4-a716-446655440000', -- Sample organization ID
-  'ScaleWize AI Demo',
+  'Henly AI Demo',
   'scalewize.ai',
   'active',
   'premium'

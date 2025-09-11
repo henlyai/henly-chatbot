@@ -35,7 +35,7 @@ JWT_REFRESH_SECRET=your-generated-refresh-secret
 OPENAI_API_KEY=your-openai-api-key
 ANTHROPIC_API_KEY=your-anthropic-api-key
 
-# CORS Configuration (your ScaleWize AI domain)
+# CORS Configuration (your Henly AI domain)
 CORS_ORIGINS=https://your-scaleWize-app.vercel.app
 
 # Database Configuration
@@ -162,7 +162,7 @@ docker run -p 3080:3080 librechat
    curl https://your-app.railway.app/api/health
    ```
 
-2. **Update ScaleWize AI:**
+2. **Update Henly AI:**
    - Add environment variables in Vercel
    - Test the integration
 

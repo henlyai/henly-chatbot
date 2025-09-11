@@ -1,8 +1,8 @@
-# MCP Implementation Guide for ScaleWize AI
+# MCP Implementation Guide for Henly AI
 
 ## 🎯 **Project Context**
 
-You are helping implement a new Model Context Protocol (MCP) server for the ScaleWize AI chatbot project. This is a multi-tenant SaaS platform where each client organization has their own MCP configurations.
+You are helping implement a new Model Context Protocol (MCP) server for the Henly AI chatbot project. This is a multi-tenant SaaS platform where each client organization has their own MCP configurations.
 
 ## 📁 **Project Structure**
 
@@ -19,7 +19,7 @@ SWAI/scalewize-chatbot/
 
 ## 🏗️ **Architecture Overview**
 
-- **Frontend**: ScaleWize AI website (Vercel) with iframe-embedded chatbot
+- **Frontend**: Henly AI website (Vercel) with iframe-embedded chatbot
 - **Chatbot**: LibreChat fork hosted on Railway
 - **MCP Servers**: Individual Railway services per MCP
 - **Database**: Supabase for MCP configuration management
@@ -219,4 +219,4 @@ Study the existing Google Drive MCP at `custom-mcp-servers/shared/google-drive-m
 - Performance is acceptable (no infinite loops)
 - Security best practices followed
 
-This guide provides all the context needed to implement a new MCP server that integrates seamlessly with the existing ScaleWize AI architecture. 
+This guide provides all the context needed to implement a new MCP server that integrates seamlessly with the existing Henly AI architecture. 

@@ -18,7 +18,7 @@ This guide will walk you through setting up a Slack app for the Slack MCP Server
    - Choose "From scratch"
 
 2. **Configure Basic Information**
-   - **App Name**: `ScaleWize AI Slack Integration` (or your preferred name)
+   - **App Name**: `Henly AI Slack Integration` (or your preferred name)
    - **Pick a workspace**: Select your target workspace
    - Click "Create App"
 
@@ -73,7 +73,7 @@ This guide will walk you through setting up a Slack app for the Slack MCP Server
 
 1. **Basic Information**
    - Go to "Basic Information" in the left sidebar
-   - Add a description: "ScaleWize AI Slack integration for team communication"
+   - Add a description: "Henly AI Slack integration for team communication"
    - Upload an app icon if desired
 
 2. **Event Subscriptions (Optional)**
@@ -123,7 +123,7 @@ node setup-first-client.js
 ```
 
 When prompted:
-- **Organization ID**: Your ScaleWize organization ID
+- **Organization ID**: Your Henly organization ID
 - **Slack Bot Token**: The `xoxb-` token you copied earlier
 - **Workspace Name**: Your Slack workspace name
 - **Railway URL**: Your deployed MCP server URL
@@ -255,7 +255,7 @@ If you encounter issues:
 1. **Check the troubleshooting section above**
 2. **Review the Slack API documentation**
 3. **Test with the debug commands**
-4. **Contact the ScaleWize AI team**
+4. **Contact the Henly AI team**
 
 ---
 

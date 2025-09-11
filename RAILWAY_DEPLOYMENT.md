@@ -63,9 +63,9 @@ ENABLE_USAGE_TRACKING=true
 2. **Copy your Railway domain** (e.g., `https://your-app.railway.app`)
 3. **This is your LibreChat URL**
 
-## Step 6: Update ScaleWize AI
+## Step 6: Update Henly AI
 
-In your **Vercel Dashboard** → **ScaleWize AI Project** → **Settings** → **Environment Variables**:
+In your **Vercel Dashboard** → **Henly AI Project** → **Settings** → **Environment Variables**:
 
 ```env
 NEXT_PUBLIC_LIBRECHAT_URL=https://your-app.railway.app
@@ -74,7 +74,7 @@ LIBRECHAT_JWT_SECRET=your-jwt-secret-from-railway
 
 ## Step 7: Test Integration
 
-1. **Visit your ScaleWize AI dashboard**
+1. **Visit your Henly AI dashboard**
 2. **Go to AI Chatbot page**
 3. **Verify the iframe loads LibreChat correctly**
 
@@ -104,7 +104,7 @@ LIBRECHAT_JWT_SECRET=your-jwt-secret-from-railway
 - Ensure Dockerfile path is correct
 
 ### Connection Issues
-- Verify CORS_ORIGINS includes your ScaleWize AI domain
+- Verify CORS_ORIGINS includes your Henly AI domain
 - Check that JWT_SECRET matches between services
 
 ### Database Issues
@@ -119,7 +119,7 @@ LIBRECHAT_JWT_SECRET=your-jwt-secret-from-railway
 
 ## 🎉 Success!
 
-Your LibreChat instance is now running on Railway and integrated with ScaleWize AI!
+Your LibreChat instance is now running on Railway and integrated with Henly AI!
 
 ---
 

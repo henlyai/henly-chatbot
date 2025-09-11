@@ -137,7 +137,7 @@ async function setupSlackMCP() {
     console.log('\n📚 Documentation:');
     console.log('- Slack API Documentation: https://api.slack.com/');
     console.log('- MCP Protocol: https://modelcontextprotocol.io/');
-    console.log('- ScaleWize AI Documentation: Check your project docs');
+    console.log('- Henley AI Documentation: Check your project docs');
 
   } catch (error) {
     console.error('❌ Setup failed:', error);

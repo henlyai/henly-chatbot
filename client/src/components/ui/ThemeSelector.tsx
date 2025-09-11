@@ -56,7 +56,7 @@ const ThemeSelector = ({ returnThemeOnly }: { returnThemeOnly?: boolean }) => {
 
   const changeTheme = useCallback(
     (value: string) => {
-      // Force light theme for ScaleWize AI - ignore user input
+      // Force light theme for Henly AI - ignore user input
       const forcedValue = 'light';
       
       const now = Date.now();

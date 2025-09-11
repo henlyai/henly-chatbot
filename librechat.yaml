@@ -8,10 +8,10 @@ version: 1.2.1
 cache: true
 
 # =============================================================================
-# SCALEWIZE AI CONFIGURATION
+# HENLY AI CONFIGURATION
 # =============================================================================
 
-# Disable default registration (auth handled by ScaleWize AI)
+# Disable default registration (auth handled by Henly AI)
 registration:
   enabled: false
   socialLogins: []

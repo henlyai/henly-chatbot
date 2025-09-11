@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# ScaleWize AI - LibreChat Setup Script
-# This script helps set up LibreChat for integration with ScaleWize AI
+# Henly AI - LibreChat Setup Script
+# This script helps set up LibreChat for integration with Henly AI
 
 set -e
 
-echo "🚀 Setting up LibreChat for ScaleWize AI Integration"
+echo "🚀 Setting up LibreChat for Henly AI Integration"
 echo "=================================================="
 
 # Colors for output
@@ -137,7 +137,7 @@ test_setup() {
     
     # Test JWT authentication
     print_status "Testing JWT authentication..."
-    # This would require a valid JWT token from ScaleWize AI
+    # This would require a valid JWT token from Henly AI
     
     print_success "Basic setup test completed"
 }
@@ -149,7 +149,7 @@ show_next_steps() {
     echo "=============================="
     echo ""
     echo "Next steps:"
-    echo "1. Update your ScaleWize AI .env.local with:"
+    echo "1. Update your Henly AI .env.local with:"
     echo "   NEXT_PUBLIC_LIBRECHAT_URL=http://localhost:3080"
     echo "   LIBRECHAT_JWT_SECRET=your-super-secret-jwt-key-here"
     echo ""
@@ -171,7 +171,7 @@ show_next_steps() {
 
 # Main execution
 main() {
-    echo "Starting LibreChat setup for ScaleWize AI..."
+    echo "Starting LibreChat setup for Henly AI..."
     echo ""
     
     check_docker

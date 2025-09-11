@@ -21,7 +21,7 @@ function PanelNavigation({
   return (
     <>
       <div className="flex gap-2">
-        {/* ThemeSelector hidden for ScaleWize AI - forced light mode */}
+        {/* ThemeSelector hidden for Henly AI - forced light mode */}
         {/* {!isChatRoute && <ThemeSelector returnThemeOnly={true} />} */}
       </div>
       <div

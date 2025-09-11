@@ -87,7 +87,7 @@ openssl rand -base64 32
    curl https://your-app.railway.app/api/health
    ```
 
-2. **Update ScaleWize AI environment variables:**
+2. **Update Henly AI environment variables:**
    - Add `LIBRECHAT_URL=https://your-app.railway.app`
    - Add `LIBRECHAT_JWT_SECRET=your-jwt-secret`
 

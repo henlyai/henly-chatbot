@@ -1,4 +1,4 @@
-# Slack MCP Server for ScaleWize AI
+# Slack MCP Server for Henly AI
 
 A comprehensive Model Context Protocol (MCP) server for Slack integration with LibreChat, designed for multi-tenant SaaS platforms.
 
@@ -308,8 +308,8 @@ MIT License - see LICENSE file for details
 For support and questions:
 - Check the troubleshooting section above
 - Review the Slack API documentation
-- Contact the ScaleWize AI team
+- Contact the Henly AI team
 
 ---
 
-**Built with ❤️ for ScaleWize AI** 
+**Built with ❤️ for Henly AI** 

@@ -37,7 +37,7 @@ export default function Footer({ className }: { className?: string }) {
   const mainContentParts = (
     typeof config?.customFooter === 'string'
       ? config.customFooter
-      : 'Powered by ScaleWize AI'
+      : 'Powered by Henly AI'
   ).split('|');
 
   useEffect(() => {

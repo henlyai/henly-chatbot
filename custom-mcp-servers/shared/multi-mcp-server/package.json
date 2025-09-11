@@ -30,6 +30,6 @@
     "typescript": "^5.3.2"
   },
   "keywords": ["mcp", "google-drive", "slack", "librechat", "multitenant"],
-  "author": "ScaleWize AI",
+  "author": "Henly AI",
   "license": "MIT"
 } 

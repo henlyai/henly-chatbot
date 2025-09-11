@@ -20,7 +20,7 @@
    **Required changes:**
    - `OPENAI_API_KEY`: Your OpenAI API key
    - `ANTHROPIC_API_KEY`: Your Anthropic API key (optional)
-   - `CORS_ORIGINS`: Your ScaleWize AI domain (e.g., `https://your-app.vercel.app`)
+   - `CORS_ORIGINS`: Your Henly AI domain (e.g., `https://your-app.vercel.app`)
 
 ## Step 2: Automated Deployment
 
@@ -36,9 +36,9 @@ This script will:
 - ✅ Wait for services to be ready
 - ✅ Display deployment information
 
-## Step 3: Update ScaleWize AI Configuration
+## Step 3: Update Henly AI Configuration
 
-In your ScaleWize AI Vercel project, add these environment variables:
+In your Henly AI Vercel project, add these environment variables:
 
 ```env
 NEXT_PUBLIC_LIBRECHAT_URL=https://your-librechat-domain.com
@@ -52,8 +52,8 @@ LIBRECHAT_JWT_SECRET=your-jwt-secret-from-env-file
    curl https://your-domain.com/api/health
    ```
 
-2. **Test from ScaleWize AI:**
-   - Visit your ScaleWize AI dashboard
+2. **Test from Henly AI:**
+   - Visit your Henly AI dashboard
    - Navigate to the AI Chatbot page
    - Verify the iframe loads correctly
 
@@ -110,8 +110,8 @@ If you encounter issues:
 1. Check the logs: `docker-compose -f deploy-compose.yml logs -f`
 2. Verify environment variables are set correctly
 3. Ensure your domain is accessible and SSL certificates are valid
-4. Check that CORS_ORIGINS includes your ScaleWize AI domain
+4. Check that CORS_ORIGINS includes your Henly AI domain
 
 ---
 
-**🎉 You're all set!** Your LibreChat instance should now be running and integrated with ScaleWize AI. 
+**🎉 You're all set!** Your LibreChat instance should now be running and integrated with Henly AI. 

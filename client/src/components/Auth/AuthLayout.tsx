@@ -70,7 +70,7 @@ function AuthLayout({
       </BlinkAnimation>
       <DisplayError />
       <div className="absolute bottom-0 left-0 md:m-4">
-        {/* ThemeSelector hidden for ScaleWize AI - forced light mode */}
+        {/* ThemeSelector hidden for Henly AI - forced light mode */}
         {/* <ThemeSelector /> */}
       </div>
 

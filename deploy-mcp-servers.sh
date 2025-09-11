@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# ScaleWize AI MCP Servers Deployment Script
+# Henly AI MCP Servers Deployment Script
 # This script helps deploy custom MCP servers for Google Drive and other services
 
 set -e
 
-echo "🚀 ScaleWize AI MCP Servers Deployment"
+echo "🚀 Henly AI MCP Servers Deployment"
 echo "======================================"
 
 # Colors for output

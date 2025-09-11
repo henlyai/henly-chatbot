@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ScaleWize AI MCP Environment Variables Setup Script
+# Henly AI MCP Environment Variables Setup Script
 # This script helps configure MCP servers via environment variables
 
 set -e

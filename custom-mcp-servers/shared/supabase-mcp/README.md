@@ -1,4 +1,4 @@
-# Supabase MCP Server for ScaleWize AI
+# Supabase MCP Server for Henly AI
 
 A comprehensive Model Context Protocol (MCP) server for Supabase database integration with LibreChat, designed for multi-tenant SaaS platforms.
 
@@ -121,7 +121,7 @@ Supabase Config → SSE Transport → PostgreSQL
 
 1. **Supabase Project** with database access
 2. **Railway Account** for deployment
-3. **ScaleWize AI Platform** with MCP support
+3. **Henly AI Platform** with MCP support
 4. **Organization ID** from your Supabase database
 
 ## 🚀 Quick Start
@@ -334,7 +334,7 @@ MIT License - see LICENSE file for details.
 For support and questions:
 1. Check the troubleshooting section above
 2. Review the error logs
-3. Contact the ScaleWize AI team
+3. Contact the Henly AI team
 
 ## 🎯 Success Criteria
 

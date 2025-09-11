@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# LibreChat Production Deployment Script for ScaleWize AI
+# LibreChat Production Deployment Script for Henly AI
 # This script automates the deployment process
 
 set -e
 
-echo "🚀 Starting LibreChat Production Deployment for ScaleWize AI"
+echo "🚀 Starting LibreChat Production Deployment for Henly AI"
 echo "=========================================================="
 
 # Colors for output
@@ -83,7 +83,7 @@ setup_ssl() {
         openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
             -keyout ssl/key.pem \
             -out ssl/cert.pem \
-            -subj "/C=US/ST=State/L=City/O=ScaleWize AI/CN=localhost"
+            -subj "/C=US/ST=State/L=City/O=Henly AI/CN=localhost"
         print_success "Generated SSL certificates"
     else
         print_warning "SSL certificates already exist"
@@ -155,13 +155,13 @@ show_deployment_info() {
     echo "   • Meilisearch: http://localhost:7700"
     echo ""
     echo "🔧 Next Steps:"
-    echo "   1. Update your ScaleWize AI configuration:"
+    echo "   1. Update your Henly AI configuration:"
     echo "      NEXT_PUBLIC_LIBRECHAT_URL=https://your-domain.com"
     echo "      LIBRECHAT_JWT_SECRET=<from .env file>"
     echo ""
     echo "   2. Configure your domain and SSL certificates"
     echo "   3. Set up monitoring and backups"
-    echo "   4. Test the integration with ScaleWize AI"
+    echo "   4. Test the integration with Henly AI"
     echo ""
     echo "📚 Useful Commands:"
     echo "   • View logs: docker-compose -f deploy-compose.yml logs -f"

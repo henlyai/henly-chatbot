@@ -43,7 +43,7 @@ scalewize-production-chatbot/
 
 ### Option 1: Single Railway Project (Recommended for < 10 clients)
 ```
-Railway Project: "ScaleWize AI Platform"
+Railway Project: "Henly AI Platform"
 ├── Service: LibreChat (Main)
 ├── Service: Google Drive MCP (Shared)
 ├── Service: Slack MCP (Shared)
@@ -54,17 +54,17 @@ Railway Project: "ScaleWize AI Platform"
 
 ### Option 2: Separate Railway Projects (Recommended for > 10 clients)
 ```
-Railway Project: "ScaleWize Shared MCPs"
+Railway Project: "Henly Shared MCPs"
 ├── Service: Google Drive MCP
 ├── Service: Slack MCP
 └── Service: Base MCP Template
 
-Railway Project: "ScaleWize Client A"
+Railway Project: "Henly Client A"
 ├── Service: LibreChat (Client A)
 ├── Service: Custom CRM MCP
 └── Service: Custom Analytics MCP
 
-Railway Project: "ScaleWize Client B"
+Railway Project: "Henly Client B"
 ├── Service: LibreChat (Client B)
 ├── Service: Custom ERP MCP
 └── Service: Custom HR MCP

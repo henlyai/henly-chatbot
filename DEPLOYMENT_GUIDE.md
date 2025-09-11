@@ -1,11 +1,11 @@
-# LibreChat Deployment Guide for ScaleWize AI
+# LibreChat Deployment Guide for Henly AI
 
-This guide covers the complete setup and deployment of LibreChat for integration with the ScaleWize AI platform.
+This guide covers the complete setup and deployment of LibreChat for integration with the Henly AI platform.
 
 ## 🏗️ Architecture Overview
 
 ```
-ScaleWize AI (Next.js) → LibreChat (Multi-tenant) → AI Models
+Henly AI (Next.js) → LibreChat (Multi-tenant) → AI Models
      ↓                        ↓                        ↓
 Supabase Auth          JWT Authentication        OpenAI/Claude/etc.
      ↓                        ↓                        ↓
@@ -18,7 +18,7 @@ User Management        Organization Context      AI Responses
 - Node.js 18+ (for development)
 - Git
 - API keys for AI models (OpenAI, Anthropic, etc.)
-- Supabase project (for ScaleWize AI)
+- Supabase project (for Henly AI)
 
 ## 🚀 Local Development Setup
 
@@ -96,7 +96,7 @@ User Management        Organization Context      AI Responses
 
 ### Step 3: Integration Testing
 
-1. **Update ScaleWize AI configuration:**
+1. **Update Henly AI configuration:**
    ```env
    # In scalewize-website/.env.local
    NEXT_PUBLIC_LIBRECHAT_URL=http://localhost:3080
@@ -104,7 +104,7 @@ User Management        Organization Context      AI Responses
    ```
 
 2. **Test the integration:**
-   - Start ScaleWize AI: `cd ../scalewize-website && npm run dev`
+   - Start Henly AI: `cd ../scalewize-website && npm run dev`
    - Visit: http://localhost:3000/dashboard/chatbot
    - Verify iframe loads LibreChat correctly
 
@@ -239,7 +239,7 @@ User Management        Organization Context      AI Responses
 
 2. **Organization-specific MCP servers:**
    ```typescript
-   // In ScaleWize AI
+   // In Henly AI
    const mcpServers = {
      "acme-corp": [
        {
@@ -479,7 +479,7 @@ User Management        Organization Context      AI Responses
 ## 📚 Additional Resources
 
 - [LibreChat Documentation](https://docs.librechat.ai/)
-- [ScaleWize AI Integration Guide](../scalewize-website/LIBRECHAT_SCALING_STRATEGY.md)
+- [Henly AI Integration Guide](../scalewize-website/LIBRECHAT_SCALING_STRATEGY.md)
 - [JWT Authentication Guide](https://jwt.io/introduction)
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
 
@@ -488,14 +488,14 @@ User Management        Organization Context      AI Responses
 For issues and questions:
 - Check the troubleshooting section above
 - Review LibreChat logs: `docker-compose logs -f`
-- Check ScaleWize AI integration logs
+- Check Henly AI integration logs
 - Open an issue in the GitHub repository
 
 ---
 
 **Next Steps:**
 1. Complete local development setup
-2. Test integration with ScaleWize AI
+2. Test integration with Henly AI
 3. Deploy to production
 4. Configure monitoring and alerts
 5. Set up backup and disaster recovery 

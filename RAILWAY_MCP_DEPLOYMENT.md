@@ -120,7 +120,7 @@ Railway will automatically monitor your MCP server using the health check endpoi
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   ScaleWize     │    │    LibreChat     │    │  Google Drive   │
+│   Henly     │    │    LibreChat     │    │  Google Drive   │
 │   Website       │───▶│   (Railway)      │───▶│   MCP Server    │
 │   (Vercel)      │    │                  │    │   (Railway)     │
 └─────────────────┘    └──────────────────┘    └─────────────────┘

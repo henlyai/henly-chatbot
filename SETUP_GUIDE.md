@@ -27,12 +27,12 @@ This guide will walk you through setting up the custom Google Drive MCP server l
 2. Click "Create Credentials" > "OAuth 2.0 Client IDs"
 3. Configure OAuth consent screen:
    - User Type: External
-   - App name: "ScaleWize AI Google Drive MCP"
+   - App name: "Henly AI Google Drive MCP"
    - User support email: your email
    - Developer contact information: your email
 4. Create OAuth 2.0 Client ID:
    - Application type: Web application
-   - Name: "ScaleWize Google Drive MCP"
+   - Name: "Henly Google Drive MCP"
    - Authorized redirect URIs:
      - `http://localhost:3001/oauth/callback` (for local development)
      - `https://your-mcp-server.railway.app/oauth/callback` (for production - we'll add this later)
@@ -318,7 +318,7 @@ If you encounter issues:
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   ScaleWize     │    │    LibreChat     │    │  Google Drive   │
+│   Henly     │    │    LibreChat     │    │  Google Drive   │
 │   Website       │───▶│   (Railway)      │───▶│   MCP Server    │
 │   (Vercel)      │    │                  │    │   (Railway)     │
 └─────────────────┘    └──────────────────┘    └─────────────────┘

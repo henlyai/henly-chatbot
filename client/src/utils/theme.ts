@@ -22,7 +22,7 @@ export const applyFontSize = (val: string) => {
 };
 
 export const getInitialTheme = () => {
-  // Force light theme for ScaleWize AI
+  // Force light theme for Henly AI
   return 'light';
   
   // Original code commented out to force light mode

@@ -1,4 +1,4 @@
-# Google Cloud Setup Guide for ScaleWize AI MCP Server
+# Google Cloud Setup Guide for Henly AI MCP Server
 
 This guide will help you set up Google Cloud credentials for the custom Google Drive MCP server.
 
@@ -57,7 +57,7 @@ This guide will help you set up Google Cloud credentials for the custom Google D
    - Click "Create"
 
 2. **App Information**
-   - App name: `ScaleWize AI MCP Server`
+   - App name: `Henly AI MCP Server`
    - User support email: Your email
    - Developer contact information: Your email
    - Click "Save and Continue"
@@ -81,7 +81,7 @@ This guide will help you set up Google Cloud credentials for the custom Google D
 
 1. **Application Type**
    - Choose "Web application"
-   - Name: `ScaleWize AI MCP Server`
+   - Name: `Henly AI MCP Server`
 
 2. **Authorized Redirect URIs**
    - Add: `http://localhost:3001/oauth/callback`

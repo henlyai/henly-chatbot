@@ -116,7 +116,7 @@ function RequestPasswordReset() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-white pt-6 dark:bg-gray-900 sm:pt-0">
       <div className="absolute bottom-0 left-0 m-4">
-        {/* ThemeSelector hidden for ScaleWize AI - forced light mode */}
+        {/* ThemeSelector hidden for Henly AI - forced light mode */}
         {/* <ThemeSelector /> */}
       </div>
       {verificationStatus ? <VerificationSuccess /> : <VerificationInProgress />}
