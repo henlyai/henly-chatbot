@@ -75,8 +75,11 @@ const startServer = async () => {
     'http://localhost:3080',
     'https://localhost:3080',
     'https://scalewize-website.vercel.app',
+    'https://henly-website.vercel.app',
+    'https://henly.ai',
+    'https://www.henly.ai',
     'https://scalewize-production-chatbot-production.up.railway.app',
-  ];
+    'https://henly-chatbot-production.up.railway.app',  ];
   app.use(cors({
     origin: function(origin, callback) {
       console.log('[CORS DEBUG] Evaluating origin:', origin);
