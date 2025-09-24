@@ -1,5 +1,5 @@
 # Railway-optimized Dockerfile for LibreChat
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
@@ -22,7 +22,7 @@ COPY packages/data-schemas/package*.json ./packages/data-schemas/
 COPY packages/api/package*.json ./packages/api/
 
 # Install ALL dependencies (including dev dependencies for build)
-RUN npm ci --legacy-peer-deps
+RUN npm ci --legacy-peer-deps --verbose
 
 # Copy source code
 COPY . .

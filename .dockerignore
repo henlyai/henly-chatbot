@@ -15,3 +15,7 @@ docs
 
 # Ignore all hidden files
 .*
+
+# Ignore debug and test files
+test-*.js
+debug-*.js
