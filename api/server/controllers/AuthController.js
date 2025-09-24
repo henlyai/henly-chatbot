@@ -189,9 +189,63 @@ const ssoLibreChatController = async (req, res) => {
       console.error('[SSO DEBUG] Error finding/creating LibreChat user:', err);
       return res.status(500).json({ error: 'Failed to find or create LibreChat user', details: err.message });
     }
-    // Issue LibreChat session token (JWT)
-    // Use generateShortLivedToken for a 1 hour session
-    const libreSession = AuthService.generateShortLivedToken(libreUser._id, '1h');
+
+    // 4. Get user's organization from Supabase for marketplace permissions
+    let organizationData = null;
+    try {
+      const { createClient } = require('@supabase/supabase-js');
+      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+      
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select(`
+          organization_id,
+          organizations!inner(
+            id,
+            name,
+            domain,
+            marketplace_settings
+          )
+        `)
+        .eq('email', userEmail)
+        .single();
+
+      if (profileError) {
+        logger.warn(`[SSO DEBUG] No profile found for ${userEmail}: ${profileError.message}`);
+      } else {
+        organizationData = {
+          id: profile.organization_id,
+          name: profile.organizations.name,
+          domain: profile.organizations.domain,
+          marketplace: profile.organizations.marketplace_settings || {
+            enabled: true,
+            allow_public_sharing: true,
+            max_public_agents: 10,
+            max_public_prompts: 20
+          }
+        };
+        logger.info(`[SSO DEBUG] Found organization for user: ${organizationData.name}`);
+      }
+    } catch (orgError) {
+      logger.error('[SSO DEBUG] Error fetching organization:', orgError);
+    }
+
+    // 5. Issue LibreChat session token (JWT) with organization context
+    const tokenPayload = {
+      id: libreUser._id
+    };
+
+    // Add organization to JWT if available
+    if (organizationData) {
+      tokenPayload.organization = organizationData;
+    }
+
+    // Generate custom JWT with organization context for marketplace
+    const jwt = require('jsonwebtoken');
+    const libreSession = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+      expiresIn: '1h',
+      algorithm: 'HS256',
+    });
     console.log('[SSO DEBUG] Issued LibreChat session token:', libreSession ? libreSession.slice(0, 20) + '...' : 'none');
     // Create a session and refresh token for SSO, just like normal login
     let session, refreshToken, refreshTokenExpires;
