@@ -240,8 +240,7 @@ const ssoLibreChatController = async (req, res) => {
       tokenPayload.organization = organizationData;
     }
 
-    // Generate custom JWT with organization context for marketplace
-    const jwt = require('jsonwebtoken');
+    // Generate custom JWT with organization context for marketplace  
     const libreSession = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
       expiresIn: '1h',
       algorithm: 'HS256',
