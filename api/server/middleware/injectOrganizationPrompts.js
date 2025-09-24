@@ -55,7 +55,7 @@ const injectOrganizationPrompts = async (req, res, next) => {
 };
 
 /**
- * Format Supabase prompt for LibreChat
+ * Format Supabase prompt for LibreChat using stored configuration
  */
 function formatPromptForLibreChat(supabasePrompt) {
   return {
@@ -65,18 +65,36 @@ function formatPromptForLibreChat(supabasePrompt) {
     oneliner: supabasePrompt.description,
     category: supabasePrompt.category || 'general',
     author: supabasePrompt.created_by,
+    authorName: 'Henly AI', // Could be fetched from profiles table
     numberOfGenerations: supabasePrompt.usage_count || 0,
     createdAt: supabasePrompt.created_at,
     updatedAt: supabasePrompt.updated_at,
     // LibreChat expects production prompt data
     productionPrompt: {
       _id: `${supabasePrompt.id}_production`,
-      prompt: supabasePrompt.prompt_text || `Help me with: {{USER_INPUT}}`,
-      type: 'text'
+      prompt: supabasePrompt.prompt_text || buildDefaultPrompt(supabasePrompt),
+      type: supabasePrompt.type || 'text'
     },
+    // Production ID points to the prompt text
+    productionId: `${supabasePrompt.id}_production`,
+    // Optional: Include variables if they exist
+    variables: supabasePrompt.variables || [],
     // Mark as organization prompt
-    isOrgPrompt: true
+    isOrgPrompt: true,
+    // Optional: Include project IDs if using LibreChat projects
+    projectIds: []
   };
+}
+
+/**
+ * Build default prompt text if none provided
+ */
+function buildDefaultPrompt(supabasePrompt) {
+  return `You are helping with ${supabasePrompt.name?.toLowerCase() || 'a task'}.
+
+Request: {{USER_INPUT}}
+
+Please provide helpful, professional assistance that addresses the user's needs effectively.`;
 }
 
 module.exports = injectOrganizationPrompts;

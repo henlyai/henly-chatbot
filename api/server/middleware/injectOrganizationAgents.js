@@ -56,7 +56,7 @@ const injectOrganizationAgents = async (req, res, next) => {
 };
 
 /**
- * Format Supabase agent for LibreChat (minimal version)
+ * Format Supabase agent for LibreChat using stored configuration
  */
 function formatAgentForLibreChat(supabaseAgent) {
   return {
@@ -64,20 +64,40 @@ function formatAgentForLibreChat(supabaseAgent) {
     id: supabaseAgent.id,
     name: supabaseAgent.name,
     description: supabaseAgent.description,
-    instructions: buildInstructions(supabaseAgent),
-    model: getModelForCategory(supabaseAgent.category),
-    provider: getProviderForCategory(supabaseAgent.category),
-    tools: getToolsForCategory(supabaseAgent.category),
+    instructions: supabaseAgent.instructions || buildInstructions(supabaseAgent),
+    model: supabaseAgent.model || getModelForCategory(supabaseAgent.category),
+    provider: supabaseAgent.provider || getProviderForCategory(supabaseAgent.category),
+    tools: supabaseAgent.tools || getToolsForCategory(supabaseAgent.category),
+    model_parameters: supabaseAgent.model_parameters || getModelParameters(supabaseAgent.category),
+    conversation_starters: supabaseAgent.conversation_starters || getConversationStarters(supabaseAgent),
     avatar: supabaseAgent.avatar_url ? { 
       source: 'url', 
       filepath: supabaseAgent.avatar_url 
     } : null,
     author: supabaseAgent.created_by,
+    authorName: 'Henly AI', // Could be fetched from profiles table
     createdAt: supabaseAgent.created_at,
     updatedAt: supabaseAgent.updated_at,
+    // LibreChat agent configuration
+    access_level: supabaseAgent.access_level || 1,
+    recursion_limit: supabaseAgent.recursion_limit || 25,
+    artifacts: supabaseAgent.artifacts || 'auto',
+    hide_sequential_outputs: supabaseAgent.hide_sequential_outputs || false,
+    end_after_tools: supabaseAgent.end_after_tools || false,
     // Mark as organization agent
     isOrgAgent: true,
-    category: supabaseAgent.category
+    category: supabaseAgent.category,
+    // LibreChat expects versions array
+    versions: [{
+      name: supabaseAgent.name,
+      description: supabaseAgent.description,
+      instructions: supabaseAgent.instructions || buildInstructions(supabaseAgent),
+      model: supabaseAgent.model || getModelForCategory(supabaseAgent.category),
+      provider: supabaseAgent.provider || getProviderForCategory(supabaseAgent.category),
+      tools: supabaseAgent.tools || getToolsForCategory(supabaseAgent.category),
+      createdAt: supabaseAgent.created_at,
+      updatedAt: supabaseAgent.updated_at
+    }]
   };
 }
 
@@ -108,6 +128,44 @@ function getToolsForCategory(category) {
     'data_analytics': ['Google Drive', 'BigQuery']
   };
   return toolMap[category] || ['Google Drive'];
+}
+
+function getModelParameters(category) {
+  const parameterMap = {
+    'sales_marketing': { temperature: 0.7, max_tokens: 2000 },
+    'customer_support': { temperature: 0.3, max_tokens: 1500 },
+    'content_creation': { temperature: 0.8, max_tokens: 3000 },
+    'data_analytics': { temperature: 0.2, max_tokens: 2000 },
+    'project_management': { temperature: 0.4, max_tokens: 1500 },
+    'operations': { temperature: 0.3, max_tokens: 1500 },
+    'hr_recruitment': { temperature: 0.5, max_tokens: 1500 },
+    'finance_accounting': { temperature: 0.1, max_tokens: 2000 }
+  };
+  return parameterMap[category] || { temperature: 0.5, max_tokens: 1500 };
+}
+
+function getConversationStarters(agent) {
+  const starterMap = {
+    'sales_marketing': [
+      "Help me qualify this lead and determine next steps",
+      "Create a proposal for a new client opportunity",
+      "Analyze our sales pipeline and suggest improvements"
+    ],
+    'customer_support': [
+      "Help me troubleshoot a client's technical issue",
+      "Draft a response to a customer complaint",
+      "Create onboarding materials for new users"
+    ],
+    'content_creation': [
+      "Create a blog post outline about AI trends",
+      "Write social media content for our latest feature",
+      "Develop a case study from client success data"
+    ]
+  };
+  return starterMap[agent.category] || [
+    `How can I help you with ${agent.category?.replace('_', ' ')} tasks?`,
+    "What would you like to work on today?"
+  ];
 }
 
 module.exports = injectOrganizationAgents;

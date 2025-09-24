@@ -18,6 +18,7 @@ const {
 } = require('~/models/Prompt');
 const { requireJwtAuth } = require('~/server/middleware');
 const injectOrganizationPrompts = require('~/server/middleware/injectOrganizationPrompts');
+const { syncPromptsToSupabase } = require('~/server/middleware/syncToSupabase');
 const { getRoleByName } = require('~/models/Role');
 
 const router = express.Router();
@@ -44,6 +45,7 @@ const checkGlobalPromptShare = generateCheckAccess({
 
 router.use(requireJwtAuth);
 router.use(injectOrganizationPrompts);
+router.use(syncPromptsToSupabase);
 router.use(checkPromptAccess);
 
 /**
