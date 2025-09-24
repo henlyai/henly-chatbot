@@ -54,14 +54,14 @@ async function loadDefaultInterface(config, configDefaults, roleName = SystemRol
   });
 
   const userPermissions = {
-    [PermissionTypes.PROMPTS]: { [Permissions.USE]: loadedInterface.prompts },
+    [PermissionTypes.PROMPTS]: { [Permissions.USE]: loadedInterface.prompts, [Permissions.CREATE]: loadedInterface.prompts },
     [PermissionTypes.BOOKMARKS]: { [Permissions.USE]: loadedInterface.bookmarks },
     [PermissionTypes.MEMORIES]: {
       [Permissions.USE]: loadedInterface.memories,
       [Permissions.OPT_OUT]: isPersonalizationEnabled,
     },
     [PermissionTypes.MULTI_CONVO]: { [Permissions.USE]: loadedInterface.multiConvo },
-    [PermissionTypes.AGENTS]: { [Permissions.USE]: loadedInterface.agents },
+    [PermissionTypes.AGENTS]: { [Permissions.USE]: loadedInterface.agents, [Permissions.CREATE]: loadedInterface.agents },
     [PermissionTypes.TEMPORARY_CHAT]: { [Permissions.USE]: loadedInterface.temporaryChat },
     [PermissionTypes.RUN_CODE]: { [Permissions.USE]: loadedInterface.runCode },
     [PermissionTypes.WEB_SEARCH]: { [Permissions.USE]: loadedInterface.webSearch },
@@ -69,19 +69,22 @@ async function loadDefaultInterface(config, configDefaults, roleName = SystemRol
   
   logger.warn(`[HENLY DEBUG] Setting user permissions for role ${roleName}:\n${JSON.stringify(userPermissions, null, 2)}`);
   await updateAccessPermissions(roleName, userPermissions);
-  await updateAccessPermissions(SystemRoles.ADMIN, {
-    [PermissionTypes.PROMPTS]: { [Permissions.USE]: loadedInterface.prompts },
+  const adminPermissions = {
+    [PermissionTypes.PROMPTS]: { [Permissions.USE]: loadedInterface.prompts, [Permissions.CREATE]: loadedInterface.prompts },
     [PermissionTypes.BOOKMARKS]: { [Permissions.USE]: loadedInterface.bookmarks },
     [PermissionTypes.MEMORIES]: {
       [Permissions.USE]: loadedInterface.memories,
       [Permissions.OPT_OUT]: isPersonalizationEnabled,
     },
     [PermissionTypes.MULTI_CONVO]: { [Permissions.USE]: loadedInterface.multiConvo },
-    [PermissionTypes.AGENTS]: { [Permissions.USE]: loadedInterface.agents },
+    [PermissionTypes.AGENTS]: { [Permissions.USE]: loadedInterface.agents, [Permissions.CREATE]: loadedInterface.agents },
     [PermissionTypes.TEMPORARY_CHAT]: { [Permissions.USE]: loadedInterface.temporaryChat },
     [PermissionTypes.RUN_CODE]: { [Permissions.USE]: loadedInterface.runCode },
     [PermissionTypes.WEB_SEARCH]: { [Permissions.USE]: loadedInterface.webSearch },
-  });
+  };
+  
+  logger.warn(`[HENLY DEBUG] Setting admin permissions:\n${JSON.stringify(adminPermissions, null, 2)}`);
+  await updateAccessPermissions(SystemRoles.ADMIN, adminPermissions);
 
   let i = 0;
   const logSettings = () => {
