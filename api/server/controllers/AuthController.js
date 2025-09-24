@@ -161,22 +161,44 @@ const ssoLibreChatController = async (req, res) => {
     }
     const userEmail = decodedToken.email;
 
-    // 3. Find or create LibreChat user by email
+    // 3. Get user's Supabase profile first to determine role
+    let supabaseUserRole = 'user'; // default fallback
+    try {
+      const { createClient } = require('@supabase/supabase-js');
+      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+      
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('email', userEmail)
+        .single();
+
+      if (!profileError && profile?.role) {
+        supabaseUserRole = profile.role;
+        console.log('[SSO DEBUG] Found Supabase role for user:', supabaseUserRole);
+      } else {
+        console.log('[SSO DEBUG] No Supabase role found, using default:', supabaseUserRole);
+      }
+    } catch (roleError) {
+      console.error('[SSO DEBUG] Error fetching user role from Supabase:', roleError);
+    }
+
+    // 4. Find or create LibreChat user by email with Supabase role
     let libreUser;
     try {
       libreUser = await findUser({ email: userEmail });
       console.log('[SSO DEBUG] LibreChat user lookup result:', libreUser);
       if (!libreUser) {
-        // Create new user in LibreChat DB
+        // Create new user in LibreChat DB with Supabase role
         const balanceConfig = {};
         libreUser = await createUser({
           provider: 'sso',
           email: userEmail,
           name: decodedToken.user_metadata?.full_name || userEmail.split('@')[0],
           emailVerified: decodedToken.email_verified || false,
-          role: 'user',
+          role: supabaseUserRole, // Use Supabase role instead of hardcoded 'user'
         }, balanceConfig, true, true);
-        console.log('[SSO DEBUG] Created new LibreChat user:', libreUser);
+        console.log('[SSO DEBUG] Created new LibreChat user with role:', supabaseUserRole);
       } else {
         // Update existing user's name if it's different
         const userName = decodedToken.user_metadata?.full_name || userEmail.split('@')[0];
@@ -190,9 +212,10 @@ const ssoLibreChatController = async (req, res) => {
       return res.status(500).json({ error: 'Failed to find or create LibreChat user', details: err.message });
     }
 
-    // 4. Get user's organization from Supabase for marketplace permissions
+    // 5. Get user's organization from Supabase for marketplace permissions
     let organizationData = null;
     try {
+      // Reuse supabase client from step 3
       const { createClient } = require('@supabase/supabase-js');
       const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
       
@@ -200,6 +223,7 @@ const ssoLibreChatController = async (req, res) => {
         .from('profiles')
         .select(`
           organization_id,
+          role,
           organizations!inner(
             id,
             name,
@@ -225,12 +249,28 @@ const ssoLibreChatController = async (req, res) => {
           }
         };
         logger.info(`[SSO DEBUG] Found organization for user: ${organizationData.name}`);
+
+        // Sync Supabase role to LibreChat user role
+        const supabaseRole = profile.role;
+        if (supabaseRole && supabaseRole !== libreUser.role) {
+          logger.info(`[SSO DEBUG] Role sync: updating LibreChat user role from '${libreUser.role}' to '${supabaseRole}'`);
+          try {
+            libreUser = await updateUser(libreUser._id, { role: supabaseRole });
+            logger.info(`[SSO DEBUG] Successfully updated user role to: ${supabaseRole}`);
+          } catch (roleUpdateError) {
+            logger.error(`[SSO DEBUG] Failed to update user role: ${roleUpdateError.message}`);
+          }
+        } else if (supabaseRole) {
+          logger.info(`[SSO DEBUG] User role already synced: ${supabaseRole}`);
+        } else {
+          logger.warn(`[SSO DEBUG] No role found in Supabase profile, keeping LibreChat role: ${libreUser.role}`);
+        }
       }
     } catch (orgError) {
       logger.error('[SSO DEBUG] Error fetching organization:', orgError);
     }
 
-    // 5. Issue LibreChat session token (JWT) with organization context
+    // 6. Issue LibreChat session token (JWT) with organization context
     const tokenPayload = {
       id: libreUser._id
     };
