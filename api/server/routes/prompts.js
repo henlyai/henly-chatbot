@@ -19,6 +19,7 @@ const {
 const { requireJwtAuth } = require('~/server/middleware');
 const injectOrganizationPrompts = require('~/server/middleware/injectOrganizationPrompts');
 const { syncPromptsToSupabase } = require('~/server/middleware/syncToSupabase');
+const { debugLibreChatAPI, debugUserContext, debugMiddlewareExecution } = require('~/server/middleware/debugLibreChat');
 const { getRoleByName } = require('~/models/Role');
 
 const router = express.Router();
@@ -44,8 +45,11 @@ const checkGlobalPromptShare = generateCheckAccess({
 });
 
 router.use(requireJwtAuth);
+router.use(debugUserContext);
+router.use(debugMiddlewareExecution);
 router.use(injectOrganizationPrompts);
 router.use(syncPromptsToSupabase);
+router.use(debugLibreChatAPI);
 router.use(checkPromptAccess);
 
 /**

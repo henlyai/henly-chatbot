@@ -4,6 +4,8 @@ const { CacheKeys, defaultSocialLogins, Constants } = require('librechat-data-pr
 const { getCustomConfig } = require('~/server/services/Config/getCustomConfig');
 const { getLdapConfig } = require('~/server/services/Config/ldap');
 const OrganizationMCPService = require('~/server/services/OrganizationMCP');
+const { debugLibreChatAPI, debugMCPLoading, debugUserContext } = require('~/server/middleware/debugLibreChat');
+const { provideDefaultOrgContext } = require('~/server/middleware/defaultOrgContext');
 const { getProjectByName } = require('~/models/Project');
 const { isEnabled } = require('~/server/utils');
 const { getLogStores } = require('~/cache');
@@ -20,6 +22,12 @@ const publicSharedLinksEnabled =
   sharedLinksEnabled &&
   (process.env.ALLOW_SHARED_LINKS_PUBLIC === undefined ||
     isEnabled(process.env.ALLOW_SHARED_LINKS_PUBLIC));
+
+// Add debugging middleware to config route
+router.use(provideDefaultOrgContext);
+router.use(debugUserContext);
+router.use(debugMCPLoading);
+router.use(debugLibreChatAPI);
 
 router.get('/', async function (req, res) {
   const cache = getLogStores(CacheKeys.CONFIG_STORE);
@@ -103,17 +111,21 @@ router.get('/', async function (req, res) {
     // Initialize MCP service
     const mcpService = new OrganizationMCPService();
     
+    // DEBUG: Interface configuration
+    logger.warn(`[CONFIG DEBUG] Interface config: ${JSON.stringify(req.app.locals.interfaceConfig, null, 2)}`);
+    logger.warn(`[CONFIG DEBUG] Model specs: ${JSON.stringify(req.app.locals.modelSpecs ? Object.keys(req.app.locals.modelSpecs) : "null", null, 2)}`);
+    
     // Get user from request (you may need to adjust this based on your auth setup)
-    console.log("[CONFIG DEBUG] req.user:", req.user);
-    console.log("[CONFIG DEBUG] DEFAULT_ORGANIZATION_ID:", process.env.DEFAULT_ORGANIZATION_ID);
+    logger.warn("[CONFIG DEBUG] req.user:", JSON.stringify(req.user, null, 2));
+    logger.warn("[CONFIG DEBUG] DEFAULT_ORGANIZATION_ID:", process.env.DEFAULT_ORGANIZATION_ID);
     const user = req.user || { organization_id: process.env.DEFAULT_ORGANIZATION_ID };
     
-    console.log("[CONFIG DEBUG] Final user object:", user);
+    logger.warn("[CONFIG DEBUG] Final user object:", JSON.stringify(user, null, 2));
     
     // Get MCP configuration from Supabase
     const mcpConfig = await mcpService.getUserMCPConfig(user);
-    console.log("[CONFIG DEBUG] MCP config returned:", mcpConfig);
-    console.log("[CONFIG DEBUG] MCP config keys:", mcpConfig ? Object.keys(mcpConfig) : "null");
+    logger.warn("[CONFIG DEBUG] MCP config returned:", JSON.stringify(mcpConfig, null, 2));
+    logger.warn("[CONFIG DEBUG] MCP config keys:", mcpConfig ? Object.keys(mcpConfig) : "null");
     
     payload.mcpServers = {};
     if (mcpConfig && Object.keys(mcpConfig).length > 0) {
@@ -166,6 +178,17 @@ router.get('/', async function (req, res) {
     if (typeof process.env.CUSTOM_FOOTER === 'string') {
       payload.customFooter = process.env.CUSTOM_FOOTER;
     }
+
+    // DEBUG: Final payload before sending
+    logger.warn("[CONFIG DEBUG] ===== FINAL CONFIG PAYLOAD =====");
+    logger.warn("[CONFIG DEBUG] Interface agents:", payload.interface?.agents);
+    logger.warn("[CONFIG DEBUG] Interface prompts:", payload.interface?.prompts);
+    logger.warn("[CONFIG DEBUG] Interface mcpServers:", payload.interface?.mcpServers);
+    logger.warn("[CONFIG DEBUG] MCP servers count:", Object.keys(payload.mcpServers || {}).length);
+    logger.warn("[CONFIG DEBUG] MCP server names:", Object.keys(payload.mcpServers || {}).join(', '));
+    logger.warn("[CONFIG DEBUG] Endpoints available:", Object.keys(payload.endpoints || {}).join(', '));
+    logger.warn("[CONFIG DEBUG] Has agents endpoint:", !!payload.endpoints?.agents);
+    logger.warn("[CONFIG DEBUG] =====================================");
 
     await cache.set(CacheKeys.STARTUP_CONFIG, payload);
     return res.status(200).send(payload);

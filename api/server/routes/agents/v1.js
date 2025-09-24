@@ -4,6 +4,7 @@ const { PermissionTypes, Permissions } = require('librechat-data-provider');
 const { requireJwtAuth } = require('~/server/middleware');
 const injectOrganizationAgents = require('~/server/middleware/injectOrganizationAgents');
 const { syncAgentsToSupabase } = require('~/server/middleware/syncToSupabase');
+const { debugLibreChatAPI, debugUserContext, debugMiddlewareExecution } = require('~/server/middleware/debugLibreChat');
 const v1 = require('~/server/controllers/agents/v1');
 const { getRoleByName } = require('~/models/Role');
 const actions = require('./actions');
@@ -33,8 +34,11 @@ const checkGlobalAgentShare = generateCheckAccess({
 });
 
 router.use(requireJwtAuth);
+router.use(debugUserContext);
+router.use(debugMiddlewareExecution);
 router.use(injectOrganizationAgents);
 router.use(syncAgentsToSupabase);
+router.use(debugLibreChatAPI);
 
 /**
  * Agent actions route.
