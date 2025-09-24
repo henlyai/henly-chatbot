@@ -161,26 +161,57 @@ const ssoLibreChatController = async (req, res) => {
     }
     const userEmail = decodedToken.email;
 
-    // 3. Get user's Supabase profile first to determine role
+    // 3. Initialize Supabase client for user profile operations
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+    
+    // Get user's Supabase profile for role and organization
     let supabaseUserRole = 'user'; // default fallback
+    let organizationData = null;
+    
     try {
-      const { createClient } = require('@supabase/supabase-js');
-      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
-      
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('role')
+        .select(`
+          role,
+          organization_id,
+          organizations!inner(
+            id,
+            name,
+            domain,
+            marketplace_settings
+          )
+        `)
         .eq('email', userEmail)
         .single();
 
-      if (!profileError && profile?.role) {
-        supabaseUserRole = profile.role;
-        console.log('[SSO DEBUG] Found Supabase role for user:', supabaseUserRole);
+      if (!profileError && profile) {
+        // Extract role
+        if (profile.role) {
+          supabaseUserRole = profile.role;
+          console.log('[SSO DEBUG] Found Supabase role for user:', supabaseUserRole);
+        }
+        
+        // Extract organization data
+        if (profile.organization_id && profile.organizations) {
+          organizationData = {
+            id: profile.organization_id,
+            name: profile.organizations.name,
+            domain: profile.organizations.domain,
+            marketplace: profile.organizations.marketplace_settings || {
+              enabled: true,
+              allow_public_sharing: true,
+              max_public_agents: 10,
+              max_public_prompts: 20
+            }
+          };
+          console.log('[SSO DEBUG] Found organization for user:', organizationData.name);
+        }
       } else {
-        console.log('[SSO DEBUG] No Supabase role found, using default:', supabaseUserRole);
+        console.log('[SSO DEBUG] No Supabase profile found, using defaults. Error:', profileError?.message);
       }
-    } catch (roleError) {
-      console.error('[SSO DEBUG] Error fetching user role from Supabase:', roleError);
+    } catch (profileFetchError) {
+      console.error('[SSO DEBUG] Error fetching user profile from Supabase:', profileFetchError);
     }
 
     // 4. Find or create LibreChat user by email with Supabase role
@@ -212,62 +243,17 @@ const ssoLibreChatController = async (req, res) => {
       return res.status(500).json({ error: 'Failed to find or create LibreChat user', details: err.message });
     }
 
-    // 5. Get user's organization from Supabase for marketplace permissions
-    let organizationData = null;
-    try {
-      // Reuse supabase client from step 3
-      const { createClient } = require('@supabase/supabase-js');
-      const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
-      
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select(`
-          organization_id,
-          role,
-          organizations!inner(
-            id,
-            name,
-            domain,
-            marketplace_settings
-          )
-        `)
-        .eq('email', userEmail)
-        .single();
-
-      if (profileError) {
-        logger.warn(`[SSO DEBUG] No profile found for ${userEmail}: ${profileError.message}`);
-      } else {
-        organizationData = {
-          id: profile.organization_id,
-          name: profile.organizations.name,
-          domain: profile.organizations.domain,
-          marketplace: profile.organizations.marketplace_settings || {
-            enabled: true,
-            allow_public_sharing: true,
-            max_public_agents: 10,
-            max_public_prompts: 20
-          }
-        };
-        logger.info(`[SSO DEBUG] Found organization for user: ${organizationData.name}`);
-
-        // Sync Supabase role to LibreChat user role
-        const supabaseRole = profile.role;
-        if (supabaseRole && supabaseRole !== libreUser.role) {
-          logger.info(`[SSO DEBUG] Role sync: updating LibreChat user role from '${libreUser.role}' to '${supabaseRole}'`);
-          try {
-            libreUser = await updateUser(libreUser._id, { role: supabaseRole });
-            logger.info(`[SSO DEBUG] Successfully updated user role to: ${supabaseRole}`);
-          } catch (roleUpdateError) {
-            logger.error(`[SSO DEBUG] Failed to update user role: ${roleUpdateError.message}`);
-          }
-        } else if (supabaseRole) {
-          logger.info(`[SSO DEBUG] User role already synced: ${supabaseRole}`);
-        } else {
-          logger.warn(`[SSO DEBUG] No role found in Supabase profile, keeping LibreChat role: ${libreUser.role}`);
-        }
+    // 5. Sync role if different from current LibreChat user role
+    if (supabaseUserRole && supabaseUserRole !== libreUser.role) {
+      logger.info(`[SSO DEBUG] Role sync: updating LibreChat user role from '${libreUser.role}' to '${supabaseUserRole}'`);
+      try {
+        libreUser = await updateUser(libreUser._id, { role: supabaseUserRole });
+        logger.info(`[SSO DEBUG] Successfully updated user role to: ${supabaseUserRole}`);
+      } catch (roleUpdateError) {
+        logger.error(`[SSO DEBUG] Failed to update user role: ${roleUpdateError.message}`);
       }
-    } catch (orgError) {
-      logger.error('[SSO DEBUG] Error fetching organization:', orgError);
+    } else if (supabaseUserRole) {
+      logger.info(`[SSO DEBUG] User role already synced: ${supabaseUserRole}`);
     }
 
     // 6. Issue LibreChat session token (JWT) with organization context
