@@ -53,7 +53,7 @@ async function loadDefaultInterface(config, configDefaults, roleName = SystemRol
     customWelcome: interfaceConfig?.customWelcome ?? defaults.customWelcome,
   });
 
-  await updateAccessPermissions(roleName, {
+  const userPermissions = {
     [PermissionTypes.PROMPTS]: { [Permissions.USE]: loadedInterface.prompts },
     [PermissionTypes.BOOKMARKS]: { [Permissions.USE]: loadedInterface.bookmarks },
     [PermissionTypes.MEMORIES]: {
@@ -65,7 +65,10 @@ async function loadDefaultInterface(config, configDefaults, roleName = SystemRol
     [PermissionTypes.TEMPORARY_CHAT]: { [Permissions.USE]: loadedInterface.temporaryChat },
     [PermissionTypes.RUN_CODE]: { [Permissions.USE]: loadedInterface.runCode },
     [PermissionTypes.WEB_SEARCH]: { [Permissions.USE]: loadedInterface.webSearch },
-  });
+  };
+  
+  logger.warn(`[HENLY DEBUG] Setting user permissions for role ${roleName}:\n${JSON.stringify(userPermissions, null, 2)}`);
+  await updateAccessPermissions(roleName, userPermissions);
   await updateAccessPermissions(SystemRoles.ADMIN, {
     [PermissionTypes.PROMPTS]: { [Permissions.USE]: loadedInterface.prompts },
     [PermissionTypes.BOOKMARKS]: { [Permissions.USE]: loadedInterface.bookmarks },
@@ -125,6 +128,11 @@ async function loadDefaultInterface(config, configDefaults, roleName = SystemRol
   if (i > 0) {
     logSettings();
   }
+
+  // DEBUG: Always log interface settings for debugging agents/prompts visibility
+  logger.warn(`[HENLY DEBUG] Interface settings loaded:\n${JSON.stringify(loadedInterface, null, 2)}`);
+  logger.warn(`[HENLY DEBUG] Agents enabled: ${loadedInterface.agents}`);
+  logger.warn(`[HENLY DEBUG] Prompts enabled: ${loadedInterface.prompts}`);
 
   return loadedInterface;
 }
