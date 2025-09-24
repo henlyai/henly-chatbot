@@ -149,6 +149,8 @@ const startServer = async () => {
   app.use('/api/agents', routes.agents);
   app.use('/api/marketplace', routes.marketplace);
   app.use('/api/super-admin', routes.superAdmin);
+  app.use('/api/organization-agents', routes.organizationAgents);
+  app.use('/api/organization-prompts', routes.organizationPrompts);
   app.use('/api/banner', routes.banner);
   app.use('/api/memories', routes.memories);
   app.use('/api/tags', routes.tags);

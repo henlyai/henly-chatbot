@@ -28,6 +28,8 @@ const user = require('./user');
 const mcp = require('./mcp');
 const marketplace = require('./marketplace');
 const superAdmin = require('./super-admin');
+const organizationAgents = require('./organization-agents');
+const organizationPrompts = require('./organization-prompts');
 
 module.exports = {
   edit,
@@ -60,4 +62,6 @@ module.exports = {
   mcp,
   marketplace,
   superAdmin,
+  organizationAgents,
+  organizationPrompts,
 };
