@@ -17,6 +17,7 @@ const {
   makePromptProduction,
 } = require('~/models/Prompt');
 const { requireJwtAuth } = require('~/server/middleware');
+const injectOrganizationPrompts = require('~/server/middleware/injectOrganizationPrompts');
 const { getRoleByName } = require('~/models/Role');
 
 const router = express.Router();
@@ -42,6 +43,7 @@ const checkGlobalPromptShare = generateCheckAccess({
 });
 
 router.use(requireJwtAuth);
+router.use(injectOrganizationPrompts);
 router.use(checkPromptAccess);
 
 /**

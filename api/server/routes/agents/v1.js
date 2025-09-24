@@ -2,6 +2,7 @@ const express = require('express');
 const { generateCheckAccess } = require('@librechat/api');
 const { PermissionTypes, Permissions } = require('librechat-data-provider');
 const { requireJwtAuth } = require('~/server/middleware');
+const injectOrganizationAgents = require('~/server/middleware/injectOrganizationAgents');
 const v1 = require('~/server/controllers/agents/v1');
 const { getRoleByName } = require('~/models/Role');
 const actions = require('./actions');
@@ -31,6 +32,7 @@ const checkGlobalAgentShare = generateCheckAccess({
 });
 
 router.use(requireJwtAuth);
+router.use(injectOrganizationAgents);
 
 /**
  * Agent actions route.

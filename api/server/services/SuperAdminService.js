@@ -1,171 +1,144 @@
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('@librechat/data-schemas');
-const { getAgent, updateAgent } = require('~/models/Agent');
-const { getPromptGroup, updatePromptGroup } = require('~/models/Prompt');
-const MarketplaceService = require('./MarketplaceService');
 
+/**
+ * Simple Super Admin Service for cross-organization management
+ * Works with the MCP-style approach using direct Supabase queries
+ */
 class SuperAdminService {
   constructor() {
     this.supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY
     );
-    this.marketplaceService = new MarketplaceService();
   }
 
   /**
-   * Get all agents across all organizations (super admin only)
+   * Get dashboard statistics
+   * @returns {Promise<Object>} Dashboard stats
+   */
+  async getDashboardStats() {
+    try {
+      const [orgsResult, agentsResult, promptsResult, usersResult] = await Promise.all([
+        this.supabase.from('organizations').select('id', { count: 'exact' }),
+        this.supabase.from('agent_library').select('id', { count: 'exact' }),
+        this.supabase.from('prompt_library').select('id', { count: 'exact' }),
+        this.supabase.from('profiles').select('id', { count: 'exact' })
+      ]);
+
+      return {
+        totalOrganizations: orgsResult.count || 0,
+        totalAgents: agentsResult.count || 0,
+        totalPrompts: promptsResult.count || 0,
+        totalUsers: usersResult.count || 0
+      };
+    } catch (error) {
+      logger.error('[SuperAdmin] Error getting dashboard stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all agents across organizations
    * @returns {Promise<Array>} All agents with organization info
    */
   async getAllAgents() {
     try {
-      const { data, error } = await this.supabase
+      const { data: agents, error } = await this.supabase
         .from('agent_library')
         .select(`
           *,
-          organizations (
-            name,
-            domain,
-            plan_type
-          ),
-          profiles!agent_library_created_by_fkey (
-            full_name,
-            email
-          )
+          organizations (id, name, domain),
+          profiles (email)
         `)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
-      }
-
-      // Enrich with LibreChat data
-      const enrichedAgents = await Promise.all(
-        data.map(async (agent) => {
-          try {
-            const librechatAgent = await getAgent({ _id: agent.librechat_agent_id });
-            return {
-              ...agent,
-              organization_name: agent.organizations?.name || 'Unknown',
-              creator_name: agent.profiles?.full_name || 'Unknown',
-              librechat_data: librechatAgent ? {
-                model: librechatAgent.model,
-                provider: librechatAgent.provider,
-                tools: librechatAgent.tools || [],
-                instructions: librechatAgent.instructions
-              } : null
-            };
-          } catch (err) {
-            logger.warn(`Failed to get LibreChat data for agent ${agent.librechat_agent_id}:`, err);
-            return {
-              ...agent,
-              organization_name: agent.organizations?.name || 'Unknown',
-              creator_name: agent.profiles?.full_name || 'Unknown',
-              librechat_data: null
-            };
-          }
-        })
-      );
-
-      return enrichedAgents;
+      if (error) throw error;
+      return agents;
     } catch (error) {
-      logger.error('[SuperAdminService] Error getting all agents:', error);
+      logger.error('[SuperAdmin] Error getting all agents:', error);
       throw error;
     }
   }
 
   /**
-   * Get all prompts across all organizations (super admin only)
+   * Get all prompts across organizations
    * @returns {Promise<Array>} All prompts with organization info
    */
   async getAllPrompts() {
     try {
-      const { data, error } = await this.supabase
+      const { data: prompts, error } = await this.supabase
         .from('prompt_library')
         .select(`
           *,
-          organizations (
-            name,
-            domain,
-            plan_type
-          ),
-          profiles!prompt_library_created_by_fkey (
-            full_name,
-            email
-          )
+          organizations (id, name, domain),
+          profiles (email)
         `)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
-      }
-
-      return data.map(prompt => ({
-        ...prompt,
-        organization_name: prompt.organizations?.name || 'Unknown',
-        creator_name: prompt.profiles?.full_name || 'Unknown'
-      }));
+      if (error) throw error;
+      return prompts;
     } catch (error) {
-      logger.error('[SuperAdminService] Error getting all prompts:', error);
+      logger.error('[SuperAdmin] Error getting all prompts:', error);
       throw error;
     }
   }
 
   /**
-   * Get all organizations with stats (super admin only)
-   * @returns {Promise<Array>} All organizations with member and resource counts
+   * Get all organizations with counts
+   * @returns {Promise<Array>} Organizations with member/content counts
    */
   async getAllOrganizations() {
     try {
-      const { data, error } = await this.supabase
+      const { data: orgs, error } = await this.supabase
         .from('organizations')
         .select(`
-          *,
-          profiles (count)
+          id,
+          name,
+          domain,
+          plan_type,
+          created_at,
+          updated_at
         `)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      // Get agent and prompt counts for each organization
-      const enrichedOrgs = await Promise.all(
-        data.map(async (org) => {
-          const [agentCount, promptCount] = await Promise.all([
-            this.getOrganizationResourceCount('agent_library', org.id),
-            this.getOrganizationResourceCount('prompt_library', org.id)
+      // Get counts for each organization
+      const orgsWithCounts = await Promise.all(
+        orgs.map(async (org) => {
+          const [membersResult, agentsResult, promptsResult] = await Promise.all([
+            this.supabase.from('profiles').select('id', { count: 'exact' }).eq('organization_id', org.id),
+            this.supabase.from('agent_library').select('id', { count: 'exact' }).eq('organization_id', org.id),
+            this.supabase.from('prompt_library').select('id', { count: 'exact' }).eq('organization_id', org.id)
           ]);
 
           return {
             ...org,
-            member_count: org.profiles?.[0]?.count || 0,
-            agent_count: agentCount,
-            prompt_count: promptCount
+            member_count: membersResult.count || 0,
+            agent_count: agentsResult.count || 0,
+            prompt_count: promptsResult.count || 0
           };
         })
       );
 
-      return enrichedOrgs;
+      return orgsWithCounts;
     } catch (error) {
-      logger.error('[SuperAdminService] Error getting all organizations:', error);
+      logger.error('[SuperAdmin] Error getting all organizations:', error);
       throw error;
     }
   }
 
   /**
-   * Share an agent to another organization
-   * @param {string} agentId - Supabase agent library ID
+   * Share agent to target organization
+   * @param {string} agentId - Agent ID to share
    * @param {string} sourceOrgId - Source organization ID
    * @param {string} targetOrgId - Target organization ID
-   * @param {string} adminUserId - Super admin user ID
-   * @returns {Promise<Object>} Shared agent data
+   * @returns {Promise<Object>} Shared agent
    */
-  async shareAgentToOrganization(agentId, sourceOrgId, targetOrgId, adminUserId) {
+  async shareAgent(agentId, sourceOrgId, targetOrgId) {
     try {
-      logger.info(`[SuperAdminService] Sharing agent ${agentId} from ${sourceOrgId} to ${targetOrgId}`);
-
-      // Get the source agent
+      // Get the original agent
       const { data: sourceAgent, error: fetchError } = await this.supabase
         .from('agent_library')
         .select('*')
@@ -177,139 +150,46 @@ class SuperAdminService {
         throw new Error('Source agent not found');
       }
 
-      // Check if already shared
-      const { data: existingShare } = await this.supabase
-        .from('agent_library')
-        .select('id')
-        .eq('librechat_agent_id', sourceAgent.librechat_agent_id)
-        .eq('organization_id', targetOrgId)
-        .single();
-
-      if (existingShare) {
-        throw new Error('Agent already shared to this organization');
-      }
-
-      // Create shared copy
-      const sharedAgentData = {
+      // Create a copy in the target organization
+      const sharedAgent = {
         organization_id: targetOrgId,
-        librechat_agent_id: sourceAgent.librechat_agent_id,
-        name: `${sourceAgent.name} (Shared)`,
+        name: sourceAgent.name,
         description: sourceAgent.description,
         category: sourceAgent.category,
-        is_default: false,
+        avatar_url: sourceAgent.avatar_url,
+        created_by: sourceAgent.created_by, // Keep original creator
         usage_count: 0,
-        created_by: adminUserId
+        is_default: false,
+        sync_status: 'synced',
+        librechat_config: sourceAgent.librechat_config
       };
 
-      const { data: sharedAgent, error: shareError } = await this.supabase
+      const { data: newAgent, error: createError } = await this.supabase
         .from('agent_library')
-        .insert([sharedAgentData])
+        .insert([sharedAgent])
         .select()
         .single();
 
-      if (shareError) {
-        throw shareError;
-      }
+      if (createError) throw createError;
 
-      logger.info(`[SuperAdminService] Agent shared successfully: ${sharedAgent.id}`);
-      return sharedAgent;
-
+      logger.info(`[SuperAdmin] Shared agent "${sourceAgent.name}" from ${sourceOrgId} to ${targetOrgId}`);
+      return newAgent;
     } catch (error) {
-      logger.error('[SuperAdminService] Error sharing agent:', error);
+      logger.error('[SuperAdmin] Error sharing agent:', error);
       throw error;
     }
   }
 
   /**
-   * Duplicate an agent to another organization
-   * @param {string} agentId - Supabase agent library ID
+   * Share prompt to target organization
+   * @param {string} promptId - Prompt ID to share
    * @param {string} sourceOrgId - Source organization ID
    * @param {string} targetOrgId - Target organization ID
-   * @param {string} adminUserId - Super admin user ID
-   * @returns {Promise<Object>} Duplicated agent data
+   * @returns {Promise<Object>} Shared prompt
    */
-  async duplicateAgentToOrganization(agentId, sourceOrgId, targetOrgId, adminUserId) {
+  async sharePrompt(promptId, sourceOrgId, targetOrgId) {
     try {
-      logger.info(`[SuperAdminService] Duplicating agent ${agentId} from ${sourceOrgId} to ${targetOrgId}`);
-
-      // Get the source agent and its LibreChat data
-      const { data: sourceAgent, error: fetchError } = await this.supabase
-        .from('agent_library')
-        .select('*')
-        .eq('id', agentId)
-        .eq('organization_id', sourceOrgId)
-        .single();
-
-      if (fetchError || !sourceAgent) {
-        throw new Error('Source agent not found');
-      }
-
-      // Get LibreChat agent data
-      const librechatAgent = await getAgent({ _id: sourceAgent.librechat_agent_id });
-      if (!librechatAgent) {
-        throw new Error('LibreChat agent data not found');
-      }
-
-      // Create new LibreChat agent (duplicate)
-      // Note: This would need to be implemented in LibreChat's agent creation API
-      // For now, we'll create a placeholder and log what needs to be done
-      
-      const newLibrechatAgentId = `duplicate_${Date.now()}_${sourceAgent.librechat_agent_id}`;
-      
-      // TODO: Implement actual LibreChat agent creation API call
-      logger.info(`[SuperAdminService] Would create new LibreChat agent with data:`, {
-        name: `${librechatAgent.name} (Copy)`,
-        description: librechatAgent.description,
-        instructions: librechatAgent.instructions,
-        model: librechatAgent.model,
-        provider: librechatAgent.provider,
-        tools: librechatAgent.tools
-      });
-
-      // Create Supabase entry for the duplicated agent
-      const duplicatedAgentData = {
-        organization_id: targetOrgId,
-        librechat_agent_id: newLibrechatAgentId,
-        name: `${sourceAgent.name} (Copy)`,
-        description: sourceAgent.description,
-        category: sourceAgent.category,
-        is_default: false,
-        usage_count: 0,
-        created_by: adminUserId
-      };
-
-      const { data: duplicatedAgent, error: duplicateError } = await this.supabase
-        .from('agent_library')
-        .insert([duplicatedAgentData])
-        .select()
-        .single();
-
-      if (duplicateError) {
-        throw duplicateError;
-      }
-
-      logger.info(`[SuperAdminService] Agent duplicated successfully: ${duplicatedAgent.id}`);
-      return duplicatedAgent;
-
-    } catch (error) {
-      logger.error('[SuperAdminService] Error duplicating agent:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Share a prompt to another organization
-   * @param {string} promptId - Supabase prompt library ID
-   * @param {string} sourceOrgId - Source organization ID
-   * @param {string} targetOrgId - Target organization ID
-   * @param {string} adminUserId - Super admin user ID
-   * @returns {Promise<Object>} Shared prompt data
-   */
-  async sharePromptToOrganization(promptId, sourceOrgId, targetOrgId, adminUserId) {
-    try {
-      logger.info(`[SuperAdminService] Sharing prompt ${promptId} from ${sourceOrgId} to ${targetOrgId}`);
-
-      // Get the source prompt
+      // Get the original prompt
       const { data: sourcePrompt, error: fetchError } = await this.supabase
         .from('prompt_library')
         .select('*')
@@ -321,60 +201,96 @@ class SuperAdminService {
         throw new Error('Source prompt not found');
       }
 
-      // Check if already shared
-      const { data: existingShare } = await this.supabase
-        .from('prompt_library')
-        .select('id')
-        .eq('librechat_group_id', sourcePrompt.librechat_group_id)
-        .eq('organization_id', targetOrgId)
-        .single();
-
-      if (existingShare) {
-        throw new Error('Prompt already shared to this organization');
-      }
-
-      // Create shared copy
-      const sharedPromptData = {
+      // Create a copy in the target organization
+      const sharedPrompt = {
         organization_id: targetOrgId,
-        librechat_group_id: sourcePrompt.librechat_group_id,
-        name: `${sourcePrompt.name} (Shared)`,
+        name: sourcePrompt.name,
         description: sourcePrompt.description,
-        category: sourcePrompt.category,
         prompt_text: sourcePrompt.prompt_text,
-        is_default: false,
+        category: sourcePrompt.category,
+        created_by: sourcePrompt.created_by, // Keep original creator
         usage_count: 0,
-        created_by: adminUserId
+        is_default: false,
+        sync_status: 'synced'
       };
 
-      const { data: sharedPrompt, error: shareError } = await this.supabase
+      const { data: newPrompt, error: createError } = await this.supabase
         .from('prompt_library')
-        .insert([sharedPromptData])
+        .insert([sharedPrompt])
         .select()
         .single();
 
-      if (shareError) {
-        throw shareError;
-      }
+      if (createError) throw createError;
 
-      logger.info(`[SuperAdminService] Prompt shared successfully: ${sharedPrompt.id}`);
-      return sharedPrompt;
-
+      logger.info(`[SuperAdmin] Shared prompt "${sourcePrompt.name}" from ${sourceOrgId} to ${targetOrgId}`);
+      return newPrompt;
     } catch (error) {
-      logger.error('[SuperAdminService] Error sharing prompt:', error);
+      logger.error('[SuperAdmin] Error sharing prompt:', error);
       throw error;
     }
   }
 
   /**
-   * Delete a shared resource (remove access from organization)
-   * @param {string} resourceType - 'agent' or 'prompt'
-   * @param {string} resourceId - Supabase resource ID
-   * @param {string} organizationId - Organization to remove access from
-   * @returns {Promise<void>}
+   * Duplicate agent to target organization (creates independent copy)
+   * @param {string} agentId - Agent ID to duplicate
+   * @param {string} sourceOrgId - Source organization ID
+   * @param {string} targetOrgId - Target organization ID
+   * @returns {Promise<Object>} Duplicated agent
    */
-  async revokeResourceAccess(resourceType, resourceId, organizationId) {
+  async duplicateAgent(agentId, sourceOrgId, targetOrgId) {
     try {
-      const tableName = resourceType === 'agent' ? 'agent_library' : 'prompt_library';
+      // Get the original agent
+      const { data: sourceAgent, error: fetchError } = await this.supabase
+        .from('agent_library')
+        .select('*')
+        .eq('id', agentId)
+        .eq('organization_id', sourceOrgId)
+        .single();
+
+      if (fetchError || !sourceAgent) {
+        throw new Error('Source agent not found');
+      }
+
+      // Create a duplicate with modified name
+      const duplicatedAgent = {
+        organization_id: targetOrgId,
+        name: `Copy of ${sourceAgent.name}`,
+        description: sourceAgent.description,
+        category: sourceAgent.category,
+        avatar_url: sourceAgent.avatar_url,
+        created_by: sourceAgent.created_by,
+        usage_count: 0,
+        is_default: false,
+        sync_status: 'synced',
+        librechat_config: sourceAgent.librechat_config
+      };
+
+      const { data: newAgent, error: createError } = await this.supabase
+        .from('agent_library')
+        .insert([duplicatedAgent])
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      logger.info(`[SuperAdmin] Duplicated agent "${sourceAgent.name}" from ${sourceOrgId} to ${targetOrgId}`);
+      return newAgent;
+    } catch (error) {
+      logger.error('[SuperAdmin] Error duplicating agent:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Revoke access to agent or prompt
+   * @param {string} resourceType - 'agents' or 'prompts'
+   * @param {string} resourceId - Resource ID to revoke
+   * @param {string} organizationId - Organization to revoke from
+   * @returns {Promise<Object>} Success result
+   */
+  async revokeAccess(resourceType, resourceId, organizationId) {
+    try {
+      const tableName = resourceType === 'agents' ? 'agent_library' : 'prompt_library';
       
       const { error } = await this.supabase
         .from(tableName)
@@ -382,67 +298,68 @@ class SuperAdminService {
         .eq('id', resourceId)
         .eq('organization_id', organizationId);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      logger.info(`[SuperAdminService] Revoked ${resourceType} access: ${resourceId} from org ${organizationId}`);
+      logger.info(`[SuperAdmin] Revoked ${resourceType} ${resourceId} from organization ${organizationId}`);
+      return { success: true };
     } catch (error) {
-      logger.error(`[SuperAdminService] Error revoking ${resourceType} access:`, error);
+      logger.error('[SuperAdmin] Error revoking access:', error);
       throw error;
     }
   }
 
   /**
-   * Get resource count for an organization
-   * @param {string} tableName - Table to count from
+   * Update agent details
+   * @param {string} agentId - Agent ID
    * @param {string} organizationId - Organization ID
-   * @returns {Promise<number>} Count of resources
+   * @param {Object} updates - Updates to apply
+   * @returns {Promise<Object>} Updated agent
    */
-  async getOrganizationResourceCount(tableName, organizationId) {
+  async updateAgent(agentId, organizationId, updates) {
     try {
-      const { count, error } = await this.supabase
-        .from(tableName)
-        .select('id', { count: 'exact' })
-        .eq('organization_id', organizationId);
+      const { data: updatedAgent, error } = await this.supabase
+        .from('agent_library')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', agentId)
+        .eq('organization_id', organizationId)
+        .select()
+        .single();
 
-      if (error) {
-        throw error;
-      }
-
-      return count || 0;
+      if (error) throw error;
+      return updatedAgent;
     } catch (error) {
-      logger.error(`[SuperAdminService] Error getting resource count for ${tableName}:`, error);
-      return 0;
+      logger.error('[SuperAdmin] Error updating agent:', error);
+      throw error;
     }
   }
 
   /**
-   * Get super admin dashboard stats
-   * @returns {Promise<Object>} Dashboard statistics
+   * Update prompt details
+   * @param {string} promptId - Prompt ID
+   * @param {string} organizationId - Organization ID
+   * @param {Object} updates - Updates to apply
+   * @returns {Promise<Object>} Updated prompt
    */
-  async getDashboardStats() {
+  async updatePrompt(promptId, organizationId, updates) {
     try {
-      const [
-        { count: totalOrgs },
-        { count: totalAgents },
-        { count: totalPrompts },
-        { count: totalUsers }
-      ] = await Promise.all([
-        this.supabase.from('organizations').select('id', { count: 'exact' }),
-        this.supabase.from('agent_library').select('id', { count: 'exact' }),
-        this.supabase.from('prompt_library').select('id', { count: 'exact' }),
-        this.supabase.from('profiles').select('id', { count: 'exact' })
-      ]);
+      const { data: updatedPrompt, error } = await this.supabase
+        .from('prompt_library')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', promptId)
+        .eq('organization_id', organizationId)
+        .select()
+        .single();
 
-      return {
-        totalOrganizations: totalOrgs || 0,
-        totalAgents: totalAgents || 0,
-        totalPrompts: totalPrompts || 0,
-        totalUsers: totalUsers || 0
-      };
+      if (error) throw error;
+      return updatedPrompt;
     } catch (error) {
-      logger.error('[SuperAdminService] Error getting dashboard stats:', error);
+      logger.error('[SuperAdmin] Error updating prompt:', error);
       throw error;
     }
   }
