@@ -2,9 +2,11 @@ const express = require('express');
 const { requireJwtAuth, checkBan } = require('~/server/middleware');
 const { logger } = require('@librechat/data-schemas');
 const MarketplaceService = require('~/server/services/MarketplaceService');
+const DefaultContentService = require('~/server/services/DefaultContentService');
 
 const router = express.Router();
 const marketplaceService = new MarketplaceService();
+const defaultContentService = new DefaultContentService();
 
 // Apply common middleware
 router.use(requireJwtAuth);
@@ -224,6 +226,66 @@ router.get('/settings', async (req, res) => {
   } catch (error) {
     logger.error('[MarketplaceRoute] Error getting marketplace settings:', error);
     res.status(500).json({ error: 'Failed to fetch marketplace settings' });
+  }
+});
+
+/**
+ * Setup default content for an organization
+ * @route POST /marketplace/setup
+ */
+router.post('/setup', async (req, res) => {
+  try {
+    const { organization_id } = req.user;
+    const userId = req.user.id;
+
+    if (!organization_id) {
+      return res.status(400).json({ error: 'Organization not found' });
+    }
+
+    logger.info(`[MarketplaceRoutes] Setting up default content for organization: ${organization_id}`);
+    
+    const result = await defaultContentService.setupDefaultContent(organization_id, userId);
+    
+    res.json({
+      success: true,
+      message: 'Default content setup completed',
+      data: result
+    });
+
+  } catch (error) {
+    logger.error('[MarketplaceRoutes] Error in setup:', error);
+    res.status(500).json({ 
+      error: 'Failed to setup default content',
+      details: error.message 
+    });
+  }
+});
+
+/**
+ * Get organization's accessible agent IDs
+ * @route GET /marketplace/organization-agents
+ */
+router.get('/organization-agents', async (req, res) => {
+  try {
+    const { organization_id } = req.user;
+
+    if (!organization_id) {
+      return res.status(400).json({ error: 'Organization not found' });
+    }
+
+    const agentIds = await marketplaceService.getOrganizationAgentIds(organization_id);
+    
+    res.json({
+      success: true,
+      agent_ids: agentIds
+    });
+
+  } catch (error) {
+    logger.error('[MarketplaceRoutes] Error getting organization agents:', error);
+    res.status(500).json({ 
+      error: 'Failed to get organization agents',
+      details: error.message 
+    });
   }
 });
 

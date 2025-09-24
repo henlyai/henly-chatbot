@@ -466,6 +466,81 @@ class MarketplaceService {
       max_public_prompts: 20
     };
   }
+
+  /**
+   * Sync agent to organization's available agents
+   * @param {Object} agent - LibreChat agent object
+   * @param {string} organizationId - Organization ID
+   * @returns {Promise<Object>} Synced agent data
+   */
+  async syncAgentToOrganization(agent, organizationId) {
+    try {
+      const { data: existingAgent } = await this.supabase
+        .from('agent_library')
+        .select('*')
+        .eq('librechat_agent_id', agent.id)
+        .eq('organization_id', organizationId)
+        .single();
+
+      const agentData = {
+        organization_id: organizationId,
+        librechat_agent_id: agent.id,
+        name: agent.name || 'Untitled Agent',
+        description: agent.description || '',
+        category: agent.category || 'general',
+        is_public: false,
+        usage_count: 0
+      };
+
+      if (existingAgent) {
+        const { data, error } = await this.supabase
+          .from('agent_library')
+          .update(agentData)
+          .eq('id', existingAgent.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      } else {
+        const { data, error } = await this.supabase
+          .from('agent_library')
+          .insert([agentData])
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      }
+    } catch (error) {
+      logger.error('[MarketplaceService] Error syncing agent to organization:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get agent IDs that an organization has access to
+   * @param {string} organizationId - Organization ID
+   * @returns {Promise<Array>} Array of accessible LibreChat agent IDs
+   */
+  async getOrganizationAgentIds(organizationId) {
+    try {
+      const { data, error } = await this.supabase
+        .from('agent_library')
+        .select('librechat_agent_id')
+        .eq('organization_id', organizationId);
+
+      if (error) {
+        logger.error(`[MarketplaceService] Error getting organization agent IDs: ${error.message}`);
+        throw error;
+      }
+
+      return data.map(item => item.librechat_agent_id);
+    } catch (error) {
+      logger.error('[MarketplaceService] Error in getOrganizationAgentIds:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = MarketplaceService;

@@ -2,40 +2,44 @@ const { logger } = require('~/config');
 
 const options = [
   {
-    label: 'com_ui_idea',
-    value: 'idea',
+    label: 'General',
+    value: 'general',
   },
   {
-    label: 'com_ui_travel',
-    value: 'travel',
+    label: 'Sales & Marketing',
+    value: 'sales_marketing',
   },
   {
-    label: 'com_ui_teach_or_explain',
-    value: 'teach_or_explain',
+    label: 'Customer Support',
+    value: 'customer_support',
   },
   {
-    label: 'com_ui_write',
-    value: 'write',
+    label: 'Data & Analytics',
+    value: 'data_analytics',
   },
   {
-    label: 'com_ui_shop',
-    value: 'shop',
+    label: 'Content Creation',
+    value: 'content_creation',
   },
   {
-    label: 'com_ui_code',
-    value: 'code',
+    label: 'Project Management',
+    value: 'project_management',
   },
   {
-    label: 'com_ui_misc',
-    value: 'misc',
+    label: 'Finance & Accounting',
+    value: 'finance_accounting',
   },
   {
-    label: 'com_ui_roleplay',
-    value: 'roleplay',
+    label: 'HR & Recruitment',
+    value: 'hr_recruitment',
   },
   {
-    label: 'com_ui_finance',
-    value: 'finance',
+    label: 'Operations',
+    value: 'operations',
+  },
+  {
+    label: 'Other',
+    value: 'other',
   },
 ];
 
