@@ -1,5 +1,6 @@
-# Railway-optimized Dockerfile for LibreChat
-FROM node:20-alpine
+# Use Railway's cached Node.js image to avoid registry issues
+# Disable BuildKit to avoid authentication issues
+FROM node:18-alpine
 
 # Set working directory
 WORKDIR /app
@@ -10,8 +11,7 @@ RUN apk add --no-cache \
     make \
     g++ \
     git \
-    curl \
-    vips-dev
+    curl
 
 # Copy package files first for better caching
 COPY package*.json ./
@@ -21,17 +21,11 @@ COPY packages/data-provider/package*.json ./packages/data-provider/
 COPY packages/data-schemas/package*.json ./packages/data-schemas/
 COPY packages/api/package*.json ./packages/api/
 
-# Install ALL dependencies (including dev dependencies for build)
-RUN npm ci --legacy-peer-deps --verbose
+# Install dependencies
+RUN npm ci --legacy-peer-deps
 
 # Copy source code
 COPY . .
-
-# Use the librechat.yaml from the repository (not hardcoded)
-RUN echo "Using librechat.yaml from repository:" && ls -la /app/librechat.yaml && cat /app/librechat.yaml
-
-# Fix Rollup platform binary issue for Railway (x64)
-RUN npm install @rollup/rollup-linux-x64-musl --no-save --ignore-scripts
 
 # Build the application
 RUN npm run build:data-provider
@@ -39,19 +33,8 @@ RUN npm run build:data-schemas
 RUN npm run build:api
 RUN npm run frontend
 
-# Remove dev dependencies to reduce image size
-RUN npm prune --production
-
-# Copy startup script
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
-
-# Expose port (Railway will set PORT env var)
+# Expose port
 EXPOSE 8080
 
-# Health check with longer timeout and retries
-HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=5 \
-    CMD curl -f http://localhost:8080/health || exit 1
-
 # Start the application
-CMD ["/start.sh"]
+CMD ["npm", "run", "backend"]
