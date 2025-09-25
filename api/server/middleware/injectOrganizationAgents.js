@@ -22,8 +22,8 @@ const injectOrganizationAgents = async (req, res, next) => {
   // Override res.json to inject our agents
   res.json = async function(data) {
     try {
-      // Only inject for agent list requests (path is '/' relative to /agents base)
-      if (req.method === 'GET' && req.path === '/' && Array.isArray(data)) {
+      // Only inject for agent list requests
+      if (req.method === 'GET' && (req.path === '/' || req.originalUrl === '/api/agents') && Array.isArray(data)) {
         const organizationId = req.user?.organization_id;
         
         if (organizationId) {

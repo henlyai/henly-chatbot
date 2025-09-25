@@ -21,8 +21,8 @@ const injectOrganizationPrompts = async (req, res, next) => {
   // Override res.json to inject our prompts
   res.json = async function(data) {
     try {
-      // Only inject for prompt list requests (path is '/' relative to /prompts base)
-      if (req.method === 'GET' && req.path === '/' && Array.isArray(data)) {
+      // Only inject for prompt list requests
+      if (req.method === 'GET' && (req.path === '/' || req.originalUrl === '/api/prompts') && Array.isArray(data)) {
         const organizationId = req.user?.organization_id;
         
         if (organizationId) {
