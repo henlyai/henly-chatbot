@@ -3,11 +3,31 @@ const { SystemRoles } = require('librechat-data-provider');
 const { Strategy: JwtStrategy, ExtractJwt } = require('passport-jwt');
 const { getUserById, updateUser } = require('~/models');
 
+// Custom JWT extraction function that checks both cookies and headers
+const extractJwtFromRequest = (req) => {
+  // First try to get from cookie (set by SSO controller)
+  if (req.cookies && req.cookies.accessToken) {
+    logger.warn(`[JWT Strategy] Found JWT in accessToken cookie: ${req.cookies.accessToken.slice(0, 20)}...`);
+    return req.cookies.accessToken;
+  }
+  
+  // Fallback to Authorization header
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    logger.warn(`[JWT Strategy] Found JWT in Authorization header: ${token.slice(0, 20)}...`);
+    return token;
+  }
+  
+  logger.warn(`[JWT Strategy] No JWT found in cookies or headers`);
+  return null;
+};
+
 // JWT strategy
 const jwtLogin = () =>
   new JwtStrategy(
     {
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: extractJwtFromRequest,
       secretOrKey: process.env.JWT_SECRET,
     },
     async (payload, done) => {
