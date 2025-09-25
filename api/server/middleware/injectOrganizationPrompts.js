@@ -15,6 +15,9 @@ const supabase = createClient(
  * Middleware to inject organization prompts into prompt list responses
  */
 const injectOrganizationPrompts = async (req, res, next) => {
+  // DEBUG: Log when middleware is called
+  logger.warn(`[PromptInjection] Middleware called for ${req.method} ${req.originalUrl} (path: ${req.path})`);
+  
   // Store original json method
   const originalJson = res.json;
   
@@ -22,8 +25,9 @@ const injectOrganizationPrompts = async (req, res, next) => {
   res.json = async function(data) {
     try {
       // Only inject for prompt list requests
-      if (req.method === 'GET' && (req.path === '/' || req.originalUrl === '/api/prompts') && Array.isArray(data)) {
+      if (req.method === 'GET' && (req.path === '/' || req.originalUrl?.includes('/api/prompts')) && Array.isArray(data)) {
         const organizationId = req.user?.organization_id;
+        logger.warn(`[PromptInjection] Processing prompt list request. User: ${req.user?.id}, Organization: ${organizationId}, Data type: ${typeof data}, Is array: ${Array.isArray(data)}`);
         
         if (organizationId) {
           logger.warn(`[PromptInjection] Injecting prompts for organization: ${organizationId}`);

@@ -16,6 +16,9 @@ const supabase = createClient(
  * Works exactly like MCP injection - intercepts the response and adds our agents
  */
 const injectOrganizationAgents = async (req, res, next) => {
+  // DEBUG: Log when middleware is called
+  logger.warn(`[AgentInjection] Middleware called for ${req.method} ${req.originalUrl} (path: ${req.path})`);
+  
   // Store original json method
   const originalJson = res.json;
   
@@ -23,8 +26,9 @@ const injectOrganizationAgents = async (req, res, next) => {
   res.json = async function(data) {
     try {
       // Only inject for agent list requests
-      if (req.method === 'GET' && (req.path === '/' || req.originalUrl === '/api/agents') && Array.isArray(data)) {
+      if (req.method === 'GET' && (req.path === '/' || req.originalUrl?.includes('/api/agents')) && Array.isArray(data)) {
         const organizationId = req.user?.organization_id;
+        logger.warn(`[AgentInjection] Processing agent list request. User: ${req.user?.id}, Organization: ${organizationId}, Data type: ${typeof data}, Is array: ${Array.isArray(data)}`);
         
         if (organizationId) {
           logger.warn(`[AgentInjection] Injecting agents for organization: ${organizationId}`);
