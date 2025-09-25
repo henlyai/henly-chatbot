@@ -171,7 +171,9 @@ const ssoLibreChatController = async (req, res) => {
     
     try {
       console.log('[SSO DEBUG] Fetching user profile for email:', userEmail);
-      const { data: profile, error: profileError } = await supabase
+      
+      // First try to get profile with marketplace_settings
+      let { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select(`
           role,
@@ -185,6 +187,27 @@ const ssoLibreChatController = async (req, res) => {
         `)
         .eq('email', userEmail)
         .single();
+
+      // If marketplace_settings column doesn't exist, try without it
+      if (profileError && profileError.code === '42703' && profileError.message.includes('marketplace_settings')) {
+        console.log('[SSO DEBUG] marketplace_settings column not found, retrying without it');
+        const { data: profileWithoutMarketplace, error: profileErrorWithoutMarketplace } = await supabase
+          .from('profiles')
+          .select(`
+            role,
+            organization_id,
+            organizations!profiles_organization_id_fkey(
+              id,
+              name,
+              domain
+            )
+          `)
+          .eq('email', userEmail)
+          .single();
+        
+        profile = profileWithoutMarketplace;
+        profileError = profileErrorWithoutMarketplace;
+      }
 
       console.log('[SSO DEBUG] Supabase profile query result:', {
         profile,
