@@ -176,7 +176,7 @@ const ssoLibreChatController = async (req, res) => {
         .select(`
           role,
           organization_id,
-          organizations!inner(
+          organizations!profiles_organization_id_fkey(
             id,
             name,
             domain,
