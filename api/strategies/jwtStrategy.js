@@ -12,6 +12,9 @@ const jwtLogin = () =>
     },
     async (payload, done) => {
       try {
+        // DEBUG: Log the entire JWT payload to see what we're getting
+        logger.warn(`[jwtLogin] JWT payload received: ${JSON.stringify(payload, null, 2)}`);
+        
         const user = await getUserById(payload?.id, '-password -__v -totpSecret');
         if (user) {
           user.id = user._id.toString();
@@ -25,7 +28,7 @@ const jwtLogin = () =>
             user.organization_id = payload.organization.id;
             logger.info(`[jwtLogin] Added organization_id to user: ${user.organization_id}`);
           } else {
-            logger.warn('[jwtLogin] No organization_id found in JWT payload');
+            logger.warn(`[jwtLogin] No organization_id found in JWT payload. Available keys: ${Object.keys(payload || {}).join(', ')}`);
           }
           
           done(null, user);
