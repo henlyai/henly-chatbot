@@ -172,8 +172,37 @@ const ssoLibreChatController = async (req, res) => {
     try {
       console.log('[SSO DEBUG] Fetching user profile for email:', userEmail);
       
-      // First try to get profile with marketplace_settings
-      let { data: profile, error: profileError } = await supabase
+      // Use service role key by default for SSO operations to bypass RLS
+      let supabaseClient = supabase;
+      if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        console.log('[SSO DEBUG] Using service role key for SSO profile query to bypass RLS');
+        supabaseClient = createClient(
+          process.env.SUPABASE_URL, 
+          process.env.SUPABASE_SERVICE_ROLE_KEY,
+          { auth: { autoRefreshToken: false, persistSession: false } }
+        );
+      } else {
+        console.log('[SSO DEBUG] No service role key available, using anon key (may encounter RLS issues)');
+      }
+      
+      // Debug: Test the Supabase connection and auth context
+      try {
+        const { data: testData, error: testError } = await supabaseClient
+          .from('profiles')
+          .select('id, email, role, organization_id')
+          .limit(1);
+        
+        console.log('[SSO DEBUG] Supabase connection test:', {
+          hasTestData: !!testData,
+          testDataLength: testData?.length || 0,
+          testError: testError?.message || 'none'
+        });
+      } catch (testErr) {
+        console.log('[SSO DEBUG] Supabase connection test failed:', testErr.message);
+      }
+      
+      // Try to get profile with marketplace_settings first
+      let { data: profile, error: profileError } = await supabaseClient
         .from('profiles')
         .select(`
           role,
@@ -191,7 +220,7 @@ const ssoLibreChatController = async (req, res) => {
       // If marketplace_settings column doesn't exist, try without it
       if (profileError && profileError.code === '42703' && profileError.message.includes('marketplace_settings')) {
         console.log('[SSO DEBUG] marketplace_settings column not found, retrying without it');
-        const { data: profileWithoutMarketplace, error: profileErrorWithoutMarketplace } = await supabase
+        const { data: profileWithoutMarketplace, error: profileErrorWithoutMarketplace } = await supabaseClient
           .from('profiles')
           .select(`
             role,
@@ -209,12 +238,12 @@ const ssoLibreChatController = async (req, res) => {
         profileError = profileErrorWithoutMarketplace;
       }
 
-      // If RLS infinite recursion error, try a simpler query or use fallback
+      // If still getting RLS infinite recursion error, try simpler approach
       if (profileError && profileError.code === '42P17' && profileError.message.includes('infinite recursion')) {
-        console.log('[SSO DEBUG] RLS infinite recursion detected, trying fallback approach');
+        console.log('[SSO DEBUG] RLS infinite recursion still detected with service role, trying simpler approach');
         
         // Try to get just the profile without the organization join
-        const { data: simpleProfile, error: simpleError } = await supabase
+        const { data: simpleProfile, error: simpleError } = await supabaseClient
           .from('profiles')
           .select('role, organization_id')
           .eq('email', userEmail)
@@ -225,7 +254,7 @@ const ssoLibreChatController = async (req, res) => {
           
           // If we have organization_id, try to get organization data separately
           if (simpleProfile.organization_id) {
-            const { data: orgData, error: orgError } = await supabase
+            const { data: orgData, error: orgError } = await supabaseClient
               .from('organizations')
               .select('id, name, domain, marketplace_settings')
               .eq('id', simpleProfile.organization_id)
@@ -252,45 +281,6 @@ const ssoLibreChatController = async (req, res) => {
           }
         } else {
           console.log('[SSO DEBUG] Simple profile query also failed:', simpleError);
-          
-          // Last resort: try with service role to bypass RLS entirely
-          if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-            console.log('[SSO DEBUG] Attempting service role fallback to bypass RLS');
-            try {
-              const serviceSupabase = createClient(
-                process.env.SUPABASE_URL, 
-                process.env.SUPABASE_SERVICE_ROLE_KEY,
-                { auth: { autoRefreshToken: false, persistSession: false } }
-              );
-              
-              const { data: serviceProfile, error: serviceError } = await serviceSupabase
-                .from('profiles')
-                .select(`
-                  role,
-                  organization_id,
-                  organizations!profiles_organization_id_fkey(
-                    id,
-                    name,
-                    domain,
-                    marketplace_settings
-                  )
-                `)
-                .eq('email', userEmail)
-                .single();
-              
-              if (!serviceError && serviceProfile) {
-                console.log('[SSO DEBUG] Service role query succeeded:', serviceProfile);
-                profile = serviceProfile;
-                profileError = null;
-              } else {
-                console.log('[SSO DEBUG] Service role query also failed:', serviceError);
-              }
-            } catch (serviceErr) {
-              console.log('[SSO DEBUG] Service role fallback error:', serviceErr);
-            }
-          }
-          
-          // Keep the original error for fallback handling if all attempts failed
         }
       }
 
