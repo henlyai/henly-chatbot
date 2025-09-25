@@ -10,10 +10,19 @@ const extractJwtFromRequest = (req) => {
   logger.warn(`[JWT Strategy] DEBUG - Authorization header:`, req.headers.authorization);
   logger.warn(`[JWT Strategy] DEBUG - All headers:`, Object.keys(req.headers));
   
-  // First try to get from cookie (set by SSO controller)
+  // First try to get from LibreChat accessToken cookie (set by SSO controller)
   if (req.cookies && req.cookies.accessToken) {
     logger.warn(`[JWT Strategy] Found JWT in accessToken cookie: ${req.cookies.accessToken.slice(0, 20)}...`);
     return req.cookies.accessToken;
+  }
+  
+  // Check for Supabase cookie that might be passed from iframe
+  const supabaseCookieName = 'sb-mtybaactacapokejmtxy-auth-token';
+  if (req.cookies && req.cookies[supabaseCookieName]) {
+    logger.warn(`[JWT Strategy] Found Supabase cookie: ${supabaseCookieName}`);
+    // This is a Supabase session cookie, not a LibreChat JWT, so we can't use it directly
+    // The iframe should call the SSO endpoint first to convert this to a LibreChat session
+    logger.warn(`[JWT Strategy] Supabase cookie found but cannot be used directly - iframe should call SSO endpoint first`);
   }
   
   // Fallback to Authorization header
