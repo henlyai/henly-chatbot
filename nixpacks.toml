@@ -2,7 +2,7 @@
 node = "18"
 
 [phases.setup]
-nixPkgs = ["nodejs-18_x", "npm-9_x"]
+nixPkgs = ["nodejs-18_x", "npm-9_x", "python3", "make", "gcc"]
 
 [phases.install]
 cmds = ["npm ci --legacy-peer-deps"]
@@ -10,7 +10,7 @@ cmds = ["npm ci --legacy-peer-deps"]
 [phases.build]
 cmds = [
     "npm run build:data-provider",
-    "npm run build:data-schemas",
+    "npm run build:data-schemas", 
     "npm run build:api",
     "npm run frontend"
 ]
