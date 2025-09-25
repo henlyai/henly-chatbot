@@ -184,6 +184,13 @@ const ssoLibreChatController = async (req, res) => {
       
       if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
         console.log('[SSO DEBUG] Using service role key for SSO profile query to bypass RLS');
+        console.log('[SSO DEBUG] Service role key details:', {
+          keyLength: process.env.SUPABASE_SERVICE_ROLE_KEY.length,
+          keyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 30) + '...',
+          keySuffix: '...' + process.env.SUPABASE_SERVICE_ROLE_KEY.substring(process.env.SUPABASE_SERVICE_ROLE_KEY.length - 10),
+          supabaseUrl: process.env.SUPABASE_URL,
+          urlPrefix: process.env.SUPABASE_URL?.substring(0, 30) + '...'
+        });
         supabaseClient = createClient(
           process.env.SUPABASE_URL, 
           process.env.SUPABASE_SERVICE_ROLE_KEY,
