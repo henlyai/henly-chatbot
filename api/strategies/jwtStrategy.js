@@ -5,6 +5,11 @@ const { getUserById, updateUser } = require('~/models');
 
 // Custom JWT extraction function that checks both cookies and headers
 const extractJwtFromRequest = (req) => {
+  // DEBUG: Log all cookies and headers for debugging
+  logger.warn(`[JWT Strategy] DEBUG - All cookies:`, req.cookies);
+  logger.warn(`[JWT Strategy] DEBUG - Authorization header:`, req.headers.authorization);
+  logger.warn(`[JWT Strategy] DEBUG - All headers:`, Object.keys(req.headers));
+  
   // First try to get from cookie (set by SSO controller)
   if (req.cookies && req.cookies.accessToken) {
     logger.warn(`[JWT Strategy] Found JWT in accessToken cookie: ${req.cookies.accessToken.slice(0, 20)}...`);
@@ -33,6 +38,7 @@ const jwtLogin = () =>
     async (payload, done) => {
       try {
         // DEBUG: Log the entire JWT payload to see what we're getting
+        logger.warn(`[jwtLogin] JWT strategy callback called!`);
         logger.warn(`[jwtLogin] JWT payload received: ${JSON.stringify(payload, null, 2)}`);
         
         const user = await getUserById(payload?.id, '-password -__v -totpSecret');
@@ -51,12 +57,14 @@ const jwtLogin = () =>
             logger.warn(`[jwtLogin] No organization_id found in JWT payload. Available keys: ${Object.keys(payload || {}).join(', ')}`);
           }
           
+          logger.warn(`[jwtLogin] Successfully authenticated user: ${user.id}, role: ${user.role}, organization_id: ${user.organization_id}`);
           done(null, user);
         } else {
           logger.warn('[jwtLogin] JwtStrategy => no user found: ' + payload?.id);
           done(null, false);
         }
       } catch (err) {
+        logger.error(`[jwtLogin] JWT strategy error:`, err);
         done(err, false);
       }
     },
