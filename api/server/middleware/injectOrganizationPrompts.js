@@ -21,12 +21,12 @@ const injectOrganizationPrompts = async (req, res, next) => {
   // Override res.json to inject our prompts
   res.json = async function(data) {
     try {
-      // Only inject for prompt list requests
-      if (req.method === 'GET' && req.path.includes('/prompts') && Array.isArray(data)) {
+      // Only inject for prompt list requests (path is '/' relative to /prompts base)
+      if (req.method === 'GET' && req.path === '/' && Array.isArray(data)) {
         const organizationId = req.user?.organization_id;
         
         if (organizationId) {
-          logger.info(`[PromptInjection] Injecting prompts for organization: ${organizationId}`);
+          logger.warn(`[PromptInjection] Injecting prompts for organization: ${organizationId}`);
           
           // Fetch organization prompts from Supabase
           const { data: orgPrompts, error } = await supabase
@@ -34,13 +34,19 @@ const injectOrganizationPrompts = async (req, res, next) => {
             .select('*')
             .eq('organization_id', organizationId);
 
+          logger.warn(`[PromptInjection] Supabase query result - Error: ${error?.message || 'none'}, Prompts found: ${orgPrompts?.length || 0}`);
+
           if (!error && orgPrompts?.length > 0) {
             // Format for LibreChat and prepend to existing prompts
             const formattedPrompts = orgPrompts.map(formatPromptForLibreChat);
             data.unshift(...formattedPrompts);
             
-            logger.info(`[PromptInjection] Added ${formattedPrompts.length} organization prompts`);
+            logger.warn(`[PromptInjection] Added ${formattedPrompts.length} organization prompts: ${formattedPrompts.map(p => p.name).join(', ')}`);
+          } else {
+            logger.warn(`[PromptInjection] No prompts found or error occurred for organization ${organizationId}`);
           }
+        } else {
+          logger.warn(`[PromptInjection] No organization_id found in request`);
         }
       }
     } catch (error) {

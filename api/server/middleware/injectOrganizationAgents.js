@@ -22,12 +22,12 @@ const injectOrganizationAgents = async (req, res, next) => {
   // Override res.json to inject our agents
   res.json = async function(data) {
     try {
-      // Only inject for agent list requests
-      if (req.method === 'GET' && req.path === '/agents' && Array.isArray(data)) {
+      // Only inject for agent list requests (path is '/' relative to /agents base)
+      if (req.method === 'GET' && req.path === '/' && Array.isArray(data)) {
         const organizationId = req.user?.organization_id;
         
         if (organizationId) {
-          logger.info(`[AgentInjection] Injecting agents for organization: ${organizationId}`);
+          logger.warn(`[AgentInjection] Injecting agents for organization: ${organizationId}`);
           
           // Fetch organization agents from Supabase
           const { data: orgAgents, error } = await supabase
@@ -35,13 +35,19 @@ const injectOrganizationAgents = async (req, res, next) => {
             .select('*')
             .eq('organization_id', organizationId);
 
+          logger.warn(`[AgentInjection] Supabase query result - Error: ${error?.message || 'none'}, Agents found: ${orgAgents?.length || 0}`);
+
           if (!error && orgAgents?.length > 0) {
             // Format for LibreChat and prepend to existing agents
             const formattedAgents = orgAgents.map(formatAgentForLibreChat);
             data.unshift(...formattedAgents);
             
-            logger.info(`[AgentInjection] Added ${formattedAgents.length} organization agents`);
+            logger.warn(`[AgentInjection] Added ${formattedAgents.length} organization agents: ${formattedAgents.map(a => a.name).join(', ')}`);
+          } else {
+            logger.warn(`[AgentInjection] No agents found or error occurred for organization ${organizationId}`);
           }
+        } else {
+          logger.warn(`[AgentInjection] No organization_id found in request`);
         }
       }
     } catch (error) {
