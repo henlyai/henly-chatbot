@@ -170,6 +170,7 @@ const ssoLibreChatController = async (req, res) => {
     let organizationData = null;
     
     try {
+      console.log('[SSO DEBUG] Fetching user profile for email:', userEmail);
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select(`
@@ -185,7 +186,20 @@ const ssoLibreChatController = async (req, res) => {
         .eq('email', userEmail)
         .single();
 
+      console.log('[SSO DEBUG] Supabase profile query result:', {
+        profile,
+        error: profileError,
+        hasProfile: !!profile,
+        hasError: !!profileError
+      });
+
       if (!profileError && profile) {
+        console.log('[SSO DEBUG] Profile found:', {
+          role: profile.role,
+          organization_id: profile.organization_id,
+          hasOrganizations: !!profile.organizations
+        });
+        
         // Extract role
         if (profile.role) {
           supabaseUserRole = profile.role;
@@ -206,6 +220,13 @@ const ssoLibreChatController = async (req, res) => {
             }
           };
           console.log('[SSO DEBUG] Found organization for user:', organizationData.name);
+        } else {
+          console.log('[SSO DEBUG] No organization data found:', {
+            hasOrganizationId: !!profile.organization_id,
+            hasOrganizations: !!profile.organizations,
+            organizationId: profile.organization_id,
+            organizations: profile.organizations
+          });
         }
       } else {
         console.log('[SSO DEBUG] No Supabase profile found, using defaults. Error:', profileError?.message);
@@ -261,9 +282,35 @@ const ssoLibreChatController = async (req, res) => {
       id: libreUser._id
     };
 
+    console.log('[SSO DEBUG] Creating JWT token payload:', {
+      userId: libreUser._id,
+      hasOrganizationData: !!organizationData,
+      organizationData: organizationData
+    });
+
     // Add organization to JWT if available
     if (organizationData) {
       tokenPayload.organization = organizationData;
+      console.log('[SSO DEBUG] Added organization to JWT payload:', organizationData);
+    } else {
+      // Fallback: use default organization if available
+      const defaultOrgId = process.env.DEFAULT_ORGANIZATION_ID;
+      if (defaultOrgId) {
+        tokenPayload.organization = {
+          id: defaultOrgId,
+          name: 'Default Organization',
+          domain: null,
+          marketplace: {
+            enabled: true,
+            allow_public_sharing: true,
+            max_public_agents: 10,
+            max_public_prompts: 20
+          }
+        };
+        console.log('[SSO DEBUG] Using default organization for JWT payload:', defaultOrgId);
+      } else {
+        console.log('[SSO DEBUG] No organization data to add to JWT payload and no default organization set');
+      }
     }
 
     // Generate custom JWT with organization context for marketplace  
@@ -272,6 +319,7 @@ const ssoLibreChatController = async (req, res) => {
       algorithm: 'HS256',
     });
     console.log('[SSO DEBUG] Issued LibreChat session token:', libreSession ? libreSession.slice(0, 20) + '...' : 'none');
+    console.log('[SSO DEBUG] Final JWT payload:', tokenPayload);
     // Create a session and refresh token for SSO, just like normal login
     let session, refreshToken, refreshTokenExpires;
     try {
