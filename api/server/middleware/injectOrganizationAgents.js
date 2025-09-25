@@ -7,6 +7,14 @@ const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('@librechat/data-schemas');
 
 // Use service role key for server-side operations to bypass RLS
+console.log('[AgentInjection] Environment variables check:', {
+  hasSupabaseUrl: !!process.env.SUPABASE_URL,
+  hasSupabaseAnonKey: !!process.env.SUPABASE_ANON_KEY,
+  hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+  serviceRoleKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.length : 0,
+  serviceRoleKeyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + '...' : 'none'
+});
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY,
@@ -40,6 +48,22 @@ const injectOrganizationAgents = async (req, res, next) => {
         if (organizationId) {
           logger.warn(`[AgentInjection] Injecting agents for organization: ${organizationId}`);
           
+          // First, test if the agent_library table exists
+          try {
+            const { data: testData, error: testError } = await supabase
+              .from('agent_library')
+              .select('id')
+              .limit(1);
+            
+            console.log('[AgentInjection] Table existence test:', {
+              hasTestData: !!testData,
+              testError: testError?.message || 'none',
+              testErrorCode: testError?.code || 'none'
+            });
+          } catch (testErr) {
+            console.log('[AgentInjection] Table existence test failed:', testErr.message);
+          }
+
           // Fetch organization agents from Supabase
           const { data: orgAgents, error } = await supabase
             .from('agent_library')
