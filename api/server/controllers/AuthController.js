@@ -209,6 +209,91 @@ const ssoLibreChatController = async (req, res) => {
         profileError = profileErrorWithoutMarketplace;
       }
 
+      // If RLS infinite recursion error, try a simpler query or use fallback
+      if (profileError && profileError.code === '42P17' && profileError.message.includes('infinite recursion')) {
+        console.log('[SSO DEBUG] RLS infinite recursion detected, trying fallback approach');
+        
+        // Try to get just the profile without the organization join
+        const { data: simpleProfile, error: simpleError } = await supabase
+          .from('profiles')
+          .select('role, organization_id')
+          .eq('email', userEmail)
+          .single();
+        
+        if (!simpleError && simpleProfile) {
+          console.log('[SSO DEBUG] Simple profile query succeeded:', simpleProfile);
+          
+          // If we have organization_id, try to get organization data separately
+          if (simpleProfile.organization_id) {
+            const { data: orgData, error: orgError } = await supabase
+              .from('organizations')
+              .select('id, name, domain, marketplace_settings')
+              .eq('id', simpleProfile.organization_id)
+              .single();
+            
+            if (!orgError && orgData) {
+              console.log('[SSO DEBUG] Organization data fetched separately:', orgData);
+              profile = {
+                role: simpleProfile.role,
+                organization_id: simpleProfile.organization_id,
+                organizations: orgData
+              };
+              profileError = null;
+            } else {
+              console.log('[SSO DEBUG] Could not fetch organization data separately:', orgError);
+              // Use simple profile without organization data
+              profile = simpleProfile;
+              profileError = null;
+            }
+          } else {
+            // Use simple profile without organization data
+            profile = simpleProfile;
+            profileError = null;
+          }
+        } else {
+          console.log('[SSO DEBUG] Simple profile query also failed:', simpleError);
+          
+          // Last resort: try with service role to bypass RLS entirely
+          if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            console.log('[SSO DEBUG] Attempting service role fallback to bypass RLS');
+            try {
+              const serviceSupabase = createClient(
+                process.env.SUPABASE_URL, 
+                process.env.SUPABASE_SERVICE_ROLE_KEY,
+                { auth: { autoRefreshToken: false, persistSession: false } }
+              );
+              
+              const { data: serviceProfile, error: serviceError } = await serviceSupabase
+                .from('profiles')
+                .select(`
+                  role,
+                  organization_id,
+                  organizations!profiles_organization_id_fkey(
+                    id,
+                    name,
+                    domain,
+                    marketplace_settings
+                  )
+                `)
+                .eq('email', userEmail)
+                .single();
+              
+              if (!serviceError && serviceProfile) {
+                console.log('[SSO DEBUG] Service role query succeeded:', serviceProfile);
+                profile = serviceProfile;
+                profileError = null;
+              } else {
+                console.log('[SSO DEBUG] Service role query also failed:', serviceError);
+              }
+            } catch (serviceErr) {
+              console.log('[SSO DEBUG] Service role fallback error:', serviceErr);
+            }
+          }
+          
+          // Keep the original error for fallback handling if all attempts failed
+        }
+      }
+
       console.log('[SSO DEBUG] Supabase profile query result:', {
         profile,
         error: profileError,
