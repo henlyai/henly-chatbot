@@ -30,4 +30,4 @@ echo "Testing health endpoint directly..."
 curl -f http://localhost:8080/health || echo "Health endpoint failed"
 
 echo "Backend started successfully. Keeping container alive..."
-wait $BACKEND_PID 
+wait $BACKEND_PID
