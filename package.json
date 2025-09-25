@@ -7,6 +7,10 @@
     "client",
     "packages/*"
   ],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "update": "node config/update.js",
     "add-balance": "node config/add-balance.js",

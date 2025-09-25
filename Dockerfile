@@ -1,5 +1,5 @@
-# Railway-optimized Dockerfile for LibreChat
-FROM node:18-alpine
+# Use a specific working Node.js version
+FROM node:18.19.0-alpine3.18
 
 # Set working directory
 WORKDIR /app
