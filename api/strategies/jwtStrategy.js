@@ -53,9 +53,16 @@ const jwtLogin = () =>
         const user = await getUserById(payload?.id, '-password -__v -totpSecret');
         if (user) {
           user.id = user._id.toString();
-          if (!user.role) {
+          
+          // Use role from JWT payload if available, otherwise default to USER
+          if (payload?.role) {
+            user.role = payload.role;
+            logger.info(`[jwtLogin] Using role from JWT payload: ${user.role}`);
+            await updateUser(user.id, { role: user.role });
+          } else if (!user.role) {
             user.role = SystemRoles.USER;
             await updateUser(user.id, { role: user.role });
+            logger.warn(`[jwtLogin] No role in JWT payload, defaulting to USER role`);
           }
           
           // Extract organization_id from JWT payload if available

@@ -172,34 +172,45 @@ const ssoLibreChatController = async (req, res) => {
     try {
       console.log('[SSO DEBUG] Fetching user profile for email:', userEmail);
       
-      // Use service role key by default for SSO operations to bypass RLS
-      let supabaseClient = supabase;
-      console.log('[SSO DEBUG] Environment variables check:', {
-        hasSupabaseUrl: !!process.env.SUPABASE_URL,
-        hasSupabaseAnonKey: !!process.env.SUPABASE_ANON_KEY,
-        hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-        serviceRoleKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.length : 0,
-        serviceRoleKeyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + '...' : 'none'
+    // Use service role key by default for SSO operations to bypass RLS
+    let supabaseClient = supabase;
+    console.log('[SSO DEBUG] Environment variables check:', {
+      hasSupabaseUrl: !!process.env.SUPABASE_URL,
+      hasSupabaseAnonKey: !!process.env.SUPABASE_ANON_KEY,
+      hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      serviceRoleKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.length : 0,
+      serviceRoleKeyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + '...' : 'none'
+    });
+
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.log('[SSO DEBUG] Using service role key for SSO profile query to bypass RLS');
+      console.log('[SSO DEBUG] Service role key details:', {
+        keyLength: process.env.SUPABASE_SERVICE_ROLE_KEY.length,
+        keyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 30) + '...',
+        keySuffix: '...' + process.env.SUPABASE_SERVICE_ROLE_KEY.substring(process.env.SUPABASE_SERVICE_ROLE_KEY.length - 10),
+        supabaseUrl: process.env.SUPABASE_URL,
+        urlPrefix: process.env.SUPABASE_URL?.substring(0, 30) + '...'
       });
       
-      if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        console.log('[SSO DEBUG] Using service role key for SSO profile query to bypass RLS');
-        console.log('[SSO DEBUG] Service role key details:', {
-          keyLength: process.env.SUPABASE_SERVICE_ROLE_KEY.length,
-          keyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 30) + '...',
-          keySuffix: '...' + process.env.SUPABASE_SERVICE_ROLE_KEY.substring(process.env.SUPABASE_SERVICE_ROLE_KEY.length - 10),
-          supabaseUrl: process.env.SUPABASE_URL,
-          urlPrefix: process.env.SUPABASE_URL?.substring(0, 30) + '...'
-        });
-        supabaseClient = createClient(
-          process.env.SUPABASE_URL, 
-          process.env.SUPABASE_SERVICE_ROLE_KEY,
-          { auth: { autoRefreshToken: false, persistSession: false } }
-        );
-      } else {
-        console.log('[SSO DEBUG] No service role key available, using anon key (may encounter RLS issues)');
-        console.log('[SSO DEBUG] Available env vars:', Object.keys(process.env).filter(key => key.includes('SUPABASE')));
-      }
+      // Additional debugging for service role key format
+      console.log('[SSO DEBUG] Service role key format analysis:', {
+        startsWithEy: process.env.SUPABASE_SERVICE_ROLE_KEY.startsWith('eyJ'),
+        containsDots: process.env.SUPABASE_SERVICE_ROLE_KEY.includes('.'),
+        hasThreeParts: process.env.SUPABASE_SERVICE_ROLE_KEY.split('.').length === 3,
+        firstPartLength: process.env.SUPABASE_SERVICE_ROLE_KEY.split('.')[0]?.length || 0,
+        secondPartLength: process.env.SUPABASE_SERVICE_ROLE_KEY.split('.')[1]?.length || 0,
+        thirdPartLength: process.env.SUPABASE_SERVICE_ROLE_KEY.split('.')[2]?.length || 0
+      });
+      
+      supabaseClient = createClient(
+        process.env.SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      );
+    } else {
+      console.log('[SSO DEBUG] No service role key available, using anon key (may encounter RLS issues)');
+      console.log('[SSO DEBUG] Available env vars:', Object.keys(process.env).filter(key => key.includes('SUPABASE')));
+    }
       
       // Debug: Test the Supabase connection and auth context
       try {

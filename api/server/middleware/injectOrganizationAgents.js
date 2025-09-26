@@ -23,6 +23,16 @@ const { logger } = require('@librechat/data-schemas');
         supabaseUrl: process.env.SUPABASE_URL,
         urlPrefix: process.env.SUPABASE_URL?.substring(0, 30) + '...'
       });
+      
+      // Additional debugging for service role key format
+      console.log('[AgentInjection] Service role key format analysis:', {
+        startsWithEy: process.env.SUPABASE_SERVICE_ROLE_KEY.startsWith('eyJ'),
+        containsDots: process.env.SUPABASE_SERVICE_ROLE_KEY.includes('.'),
+        hasThreeParts: process.env.SUPABASE_SERVICE_ROLE_KEY.split('.').length === 3,
+        firstPartLength: process.env.SUPABASE_SERVICE_ROLE_KEY.split('.')[0]?.length || 0,
+        secondPartLength: process.env.SUPABASE_SERVICE_ROLE_KEY.split('.')[1]?.length || 0,
+        thirdPartLength: process.env.SUPABASE_SERVICE_ROLE_KEY.split('.')[2]?.length || 0
+      });
     }
 
     const supabase = createClient(
@@ -58,21 +68,37 @@ const injectOrganizationAgents = async (req, res, next) => {
         if (organizationId) {
           logger.warn(`[AgentInjection] Injecting agents for organization: ${organizationId}`);
           
-          // First, test if the agent_library table exists
-          try {
-            const { data: testData, error: testError } = await supabase
-              .from('agent_library')
-              .select('id')
-              .limit(1);
-            
-            console.log('[AgentInjection] Table existence test:', {
-              hasTestData: !!testData,
-              testError: testError?.message || 'none',
-              testErrorCode: testError?.code || 'none'
-            });
-          } catch (testErr) {
-            console.log('[AgentInjection] Table existence test failed:', testErr.message);
-          }
+              // First, test if the agent_library table exists
+              try {
+                const { data: testData, error: testError } = await supabase
+                  .from('agent_library')
+                  .select('id')
+                  .limit(1);
+
+                console.log('[AgentInjection] Table existence test:', {
+                  hasTestData: !!testData,
+                  testError: testError?.message || 'none',
+                  testErrorCode: testError?.code || 'none'
+                });
+              } catch (testErr) {
+                console.log('[AgentInjection] Table existence test failed:', testErr.message);
+              }
+              
+              // Test basic Supabase authentication with service role key
+              try {
+                const { data: authTestData, error: authTestError } = await supabase
+                  .from('profiles')
+                  .select('id')
+                  .limit(1);
+
+                console.log('[AgentInjection] Service role auth test:', {
+                  hasAuthTestData: !!authTestData,
+                  authTestError: authTestError?.message || 'none',
+                  authTestErrorCode: authTestError?.code || 'none'
+                });
+              } catch (authTestErr) {
+                console.log('[AgentInjection] Service role auth test failed:', authTestErr.message);
+              }
 
           // Fetch organization agents from Supabase
           const { data: orgAgents, error } = await supabase
