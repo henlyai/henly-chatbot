@@ -53,6 +53,9 @@ const { logger } = require('@librechat/data-schemas');
 const injectOrganizationAgents = async (req, res, next) => {
   // DEBUG: Log when middleware is called
   logger.warn(`[AgentInjection] Middleware called for ${req.method} ${req.originalUrl} (path: ${req.path})`);
+  logger.warn(`[AgentInjection] Request headers:`, Object.keys(req.headers));
+  logger.warn(`[AgentInjection] Request cookies:`, req.cookies);
+  logger.warn(`[AgentInjection] Request user:`, req.user);
   
   // Store original json method
   const originalJson = res.json;
