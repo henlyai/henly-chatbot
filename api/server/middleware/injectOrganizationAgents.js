@@ -65,6 +65,12 @@ const injectOrganizationAgents = async (req, res, next) => {
         const organizationId = req.user?.organization_id;
         logger.warn(`[AgentInjection] Processing agent list request. User: ${req.user?.id}, Organization: ${organizationId}, Data type: ${typeof data}, Is array: ${Array.isArray(data)}`);
         
+        // DEBUG: Log the entire req.user object to see what's available
+        logger.warn(`[AgentInjection] Full req.user object:`, JSON.stringify(req.user, null, 2));
+        logger.warn(`[AgentInjection] req.user keys:`, Object.keys(req.user || {}));
+        logger.warn(`[AgentInjection] req.user.organization_id type:`, typeof req.user?.organization_id);
+        logger.warn(`[AgentInjection] req.user.organization_id value:`, req.user?.organization_id);
+        
         if (organizationId) {
           logger.warn(`[AgentInjection] Injecting agents for organization: ${organizationId}`);
           
