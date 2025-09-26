@@ -108,7 +108,7 @@ router.post('/:id/revert', checkGlobalAgentShare, v1.revertAgentVersion);
  * @param {AgentListParams} req.query - The agent list parameters for pagination and sorting.
  * @returns {AgentListResponse} 200 - success response - application/json
  */
-router.get('/', checkAgentAccess, v1.getListAgents);
+router.get('/', v1.getListAgents);
 
 /**
  * Uploads and updates an avatar for a specific agent.

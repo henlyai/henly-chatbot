@@ -50,7 +50,6 @@ router.use(debugMiddlewareExecution);
 router.use(injectOrganizationPrompts);
 router.use(syncPromptsToSupabase);
 router.use(debugLibreChatAPI);
-router.use(checkPromptAccess);
 
 /**
  * Route to get single prompt group by its ID
