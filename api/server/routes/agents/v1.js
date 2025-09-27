@@ -34,6 +34,11 @@ const checkGlobalAgentShare = generateCheckAccess({
 });
 
 router.use(requireJwtAuth);
+// Add simple request logging
+router.use((req, res, next) => {
+  logger.warn(`[AGENT ROUTE] ${req.method} ${req.originalUrl} - User: ${req.user?.id}, Org: ${req.user?.organization_id}`);
+  next();
+});
 router.use(injectOrganizationAgents);
 
 /**

@@ -112,7 +112,11 @@ router.get('/', async function (req, res) {
     const mcpService = new OrganizationMCPService();
     
     // DEBUG: Interface configuration
+    logger.warn(`[CONFIG DEBUG] ===== CONFIG ROUTE CALLED =====`);
     logger.warn(`[CONFIG DEBUG] Interface config: ${JSON.stringify(req.app.locals.interfaceConfig, null, 2)}`);
+    logger.warn(`[CONFIG DEBUG] Agents enabled: ${req.app.locals.interfaceConfig?.agents}`);
+    logger.warn(`[CONFIG DEBUG] Prompts enabled: ${req.app.locals.interfaceConfig?.prompts}`);
+    logger.warn(`[CONFIG DEBUG] MCP servers config: ${JSON.stringify(req.app.locals.interfaceConfig?.mcpServers, null, 2)}`);
     logger.warn(`[CONFIG DEBUG] Model specs: ${JSON.stringify(req.app.locals.modelSpecs ? Object.keys(req.app.locals.modelSpecs) : "null", null, 2)}`);
     
     // Get user from request (you may need to adjust this based on your auth setup)

@@ -51,8 +51,15 @@ const { logger } = require('@librechat/data-schemas');
  * Works exactly like MCP injection - intercepts the response and adds our agents
  */
 const injectOrganizationAgents = async (req, res, next) => {
-  // Simple logging
-  logger.warn(`[AgentInjection] Middleware called for ${req.method} ${req.originalUrl}`);
+  // Comprehensive logging
+  logger.warn(`[AgentInjection] ===== MIDDLEWARE CALLED =====`);
+  logger.warn(`[AgentInjection] Method: ${req.method}`);
+  logger.warn(`[AgentInjection] Original URL: ${req.originalUrl}`);
+  logger.warn(`[AgentInjection] Path: ${req.path}`);
+  logger.warn(`[AgentInjection] Query:`, req.query);
+  logger.warn(`[AgentInjection] User ID: ${req.user?.id}`);
+  logger.warn(`[AgentInjection] Organization ID: ${req.user?.organization_id}`);
+  logger.warn(`[AgentInjection] User Role: ${req.user?.role}`);
   
   // Store original json method
   const originalJson = res.json;
@@ -60,8 +67,19 @@ const injectOrganizationAgents = async (req, res, next) => {
   // Override res.json to inject our agents
   res.json = async function(data) {
     try {
+      logger.warn(`[AgentInjection] ===== JSON RESPONSE INTERCEPTED =====`);
+      logger.warn(`[AgentInjection] Data type: ${typeof data}`);
+      logger.warn(`[AgentInjection] Data is array: ${Array.isArray(data)}`);
+      logger.warn(`[AgentInjection] Data length: ${Array.isArray(data) ? data.length : 'N/A'}`);
+      logger.warn(`[AgentInjection] Data sample:`, Array.isArray(data) ? data.slice(0, 2) : data);
+      
       // Only inject for the main agent list requests (not tools sub-endpoints)
       const isMainAgentsList = req.method === 'GET' && req.originalUrl?.includes('/api/agents') && !req.originalUrl?.includes('/tools');
+      
+      logger.warn(`[AgentInjection] Is main agents list: ${isMainAgentsList}`);
+      logger.warn(`[AgentInjection] Method check: ${req.method === 'GET'}`);
+      logger.warn(`[AgentInjection] URL check: ${req.originalUrl?.includes('/api/agents')}`);
+      logger.warn(`[AgentInjection] Not tools check: ${!req.originalUrl?.includes('/tools')}`);
       
       if (isMainAgentsList && Array.isArray(data)) {
         // Add cache-busting headers to prevent browser caching
@@ -125,19 +143,22 @@ const injectOrganizationAgents = async (req, res, next) => {
             const formattedAgents = orgAgents.map(formatAgentForLibreChat);
             data.unshift(...formattedAgents);
             
-            logger.warn(`[AgentInjection] Added ${formattedAgents.length} organization agents: ${formattedAgents.map(a => a.name).join(', ')}`);
+            logger.warn(`[AgentInjection] ✅ Added ${formattedAgents.length} organization agents: ${formattedAgents.map(a => a.name).join(', ')}`);
+            logger.warn(`[AgentInjection] Final data length: ${data.length}`);
           } else {
-            logger.warn(`[AgentInjection] No agents found or error occurred for organization ${organizationId}`);
+            logger.warn(`[AgentInjection] ❌ No agents found or error occurred for organization ${organizationId}`);
           }
         } else {
-          logger.warn(`[AgentInjection] No organization_id found in request`);
+          logger.warn(`[AgentInjection] ❌ No organization_id found in request`);
         }
+      } else {
+        logger.warn(`[AgentInjection] ⚠️  Skipping injection - not main agents list or not array`);
       }
     } catch (error) {
-      logger.error('[AgentInjection] Error injecting agents:', error);
+      logger.error('[AgentInjection] Error in injection logic:', error);
     }
     
-    // Call original json method
+    logger.warn(`[AgentInjection] ===== CALLING ORIGINAL JSON METHOD =====`);
     return originalJson.call(this, data);
   };
   
