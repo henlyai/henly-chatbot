@@ -65,6 +65,10 @@ const injectOrganizationAgents = async (req, res, next) => {
     try {
       // Only inject for agent list requests
       if (req.method === 'GET' && (req.path === '/' || req.originalUrl?.includes('/api/agents')) && Array.isArray(data)) {
+        // Add cache-busting headers to prevent browser caching
+        res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
         const organizationId = req.user?.organization_id;
         logger.warn(`[AgentInjection] Processing agent list request. User: ${req.user?.id}, Organization: ${organizationId}, Data type: ${typeof data}, Is array: ${Array.isArray(data)}`);
         

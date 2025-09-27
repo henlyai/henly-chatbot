@@ -51,6 +51,10 @@ const injectOrganizationPrompts = async (req, res, next) => {
     try {
       // Only inject for prompt list requests
       if (req.method === 'GET' && (req.path === '/' || req.originalUrl?.includes('/api/prompts')) && Array.isArray(data)) {
+        // Add cache-busting headers to prevent browser caching
+        res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
         const organizationId = req.user?.organization_id;
         logger.warn(`[PromptInjection] Processing prompt list request. User: ${req.user?.id}, Organization: ${organizationId}, Data type: ${typeof data}, Is array: ${Array.isArray(data)}`);
         
