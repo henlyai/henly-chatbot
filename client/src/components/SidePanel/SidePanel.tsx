@@ -89,6 +89,17 @@ const SidePanel = ({
     endpointsConfig,
   });
 
+  // DEBUG: Log side panel state
+  console.log('[SidePanel DEBUG] Panel state:', {
+    isCollapsed,
+    fullCollapse,
+    minSize,
+    collapsedSize,
+    isSmallScreen,
+    linksCount: Links?.length || 0,
+    links: Links?.map(l => ({ id: l.id, title: l.title })) || []
+  });
+
   const toggleNavVisible = useCallback(() => {
     if (newUser) {
       setNewUser(false);
