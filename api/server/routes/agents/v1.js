@@ -36,6 +36,13 @@ const checkGlobalAgentShare = generateCheckAccess({
 router.use(requireJwtAuth);
 router.use(debugUserContext);
 router.use(debugMiddlewareExecution);
+// Add comprehensive request logging to catch ALL agent requests
+router.use((req, res, next) => {
+  logger.warn(`[AGENT ROUTES DEBUG] ${req.method} ${req.originalUrl} (path: ${req.path})`);
+  logger.warn(`[AGENT ROUTES DEBUG] Query params:`, req.query);
+  logger.warn(`[AGENT ROUTES DEBUG] User:`, req.user?.id, req.user?.organization_id);
+  next();
+});
 router.use(injectOrganizationAgents);
 router.use(syncAgentsToSupabase);
 router.use(debugLibreChatAPI);

@@ -77,9 +77,6 @@ interface:
   bookmarks: true
   multiConvo: true
   agents: true
-  # Force enable agent and prompt features
-  agentsTab: true
-  promptsTab: true
   # CRITICAL: Enable MCP servers interface - must be an object, not boolean
   mcpServers:
     placeholder: "Select an MCP server..."
