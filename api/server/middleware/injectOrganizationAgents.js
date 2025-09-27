@@ -34,17 +34,37 @@ const formatAgentForLibreChat = (agent) => ({
  * Middleware to inject organization agents into agent list responses
  */
 const injectOrganizationAgents = async (req, res, next) => {
+  logger.warn(`[AgentInjection] ===== MIDDLEWARE CALLED =====`);
+  logger.warn(`[AgentInjection] Method: ${req.method}`);
+  logger.warn(`[AgentInjection] Original URL: ${req.originalUrl}`);
+  logger.warn(`[AgentInjection] Path: ${req.path}`);
+  logger.warn(`[AgentInjection] Query:`, req.query);
+  logger.warn(`[AgentInjection] User ID: ${req.user?.id}`);
+  logger.warn(`[AgentInjection] Organization ID: ${req.user?.organization_id}`);
+  logger.warn(`[AgentInjection] User Role: ${req.user?.role}`);
+  
   // Store original json method
   const originalJson = res.json;
   
   // Override res.json to inject our agents
   res.json = async function(data) {
     try {
+      logger.warn(`[AgentInjection] ===== JSON RESPONSE INTERCEPTED =====`);
+      logger.warn(`[AgentInjection] Data type: ${typeof data}`);
+      logger.warn(`[AgentInjection] Data is array: ${Array.isArray(data)}`);
+      logger.warn(`[AgentInjection] Data length: ${Array.isArray(data) ? data.length : 'N/A'}`);
+      logger.warn(`[AgentInjection] Data sample:`, Array.isArray(data) ? data.slice(0, 2) : data);
+      
       // Only inject for main agent list requests
       const isMainAgentsList = req.method === 'GET' && 
         req.originalUrl?.includes('/api/agents') && 
         !req.originalUrl?.includes('/tools') &&
         Array.isArray(data);
+      
+      logger.warn(`[AgentInjection] Is main agents list: ${isMainAgentsList}`);
+      logger.warn(`[AgentInjection] Method check: ${req.method === 'GET'}`);
+      logger.warn(`[AgentInjection] URL check: ${req.originalUrl?.includes('/api/agents')}`);
+      logger.warn(`[AgentInjection] Not tools check: ${!req.originalUrl?.includes('/tools')}`);
       
       if (isMainAgentsList) {
         logger.warn(`[AgentInjection] Processing agent list request. User: ${req.user?.id}, Organization: ${req.user?.organization_id}`);
