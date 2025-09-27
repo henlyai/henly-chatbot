@@ -38,7 +38,7 @@ const injectOrganizationPrompts = async (req, res, next) => {
     try {
       // Only inject for main prompt list requests
       const isMainPromptsList = req.method === 'GET' && 
-        req.originalUrl?.includes('/api/prompts') && 
+        req.originalUrl?.includes('/api/prompts/all') && 
         Array.isArray(data);
       
       logger.warn(`[PromptInjection] Processing request: ${req.method} ${req.originalUrl}, isMainPromptsList: ${isMainPromptsList}`);
