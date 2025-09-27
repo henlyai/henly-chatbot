@@ -51,34 +51,8 @@ const { logger } = require('@librechat/data-schemas');
  * Works exactly like MCP injection - intercepts the response and adds our agents
  */
 const injectOrganizationAgents = async (req, res, next) => {
-  // DEBUG: Log when middleware is called
-  logger.warn(`[AgentInjection] Middleware called for ${req.method} ${req.originalUrl} (path: ${req.path})`);
-  logger.warn(`[AgentInjection] Request headers:`, Object.keys(req.headers));
-  logger.warn(`[AgentInjection] Request cookies:`, req.cookies);
-  logger.warn(`[AgentInjection] Request user:`, req.user);
-  
-  // DEBUG: Check if this is any agents-related request
-  const isAgentsRelated = req.originalUrl?.includes('/api/agents');
-  const isMainAgentsRequest = req.method === 'GET' && (
-    req.originalUrl?.includes('/api/agents?') || 
-    req.originalUrl === '/api/agents' ||
-    (req.path === '/' && req.originalUrl?.includes('/api/agents'))
-  );
-  const isToolsRequest = req.originalUrl?.includes('/api/agents/tools');
-  logger.warn(`[AgentInjection] Is agents-related: ${isAgentsRelated}, Is main agents request: ${isMainAgentsRequest}, Is tools request: ${isToolsRequest}`);
-  logger.warn(`[AgentInjection] URL breakdown: originalUrl=${req.originalUrl}, path=${req.path}, query=${req.query}`);
-  logger.warn(`[AgentInjection] Request method: ${req.method}, User agent: ${req.headers['user-agent']}`);
-  
-  // DEBUG: Log what type of request this is
-  if (isMainAgentsRequest) {
-    logger.warn(`[AgentInjection] ✅ MAIN AGENTS LIST REQUEST DETECTED`);
-  } else if (isToolsRequest) {
-    logger.warn(`[AgentInjection] ⚠️  TOOLS REQUEST DETECTED (not agents list)`);
-  } else if (isAgentsRelated) {
-    logger.warn(`[AgentInjection] ℹ️  OTHER AGENTS REQUEST DETECTED`);
-  } else {
-    logger.warn(`[AgentInjection] ❌ NOT AN AGENTS REQUEST`);
-  }
+  // Simple logging
+  logger.warn(`[AgentInjection] Middleware called for ${req.method} ${req.originalUrl}`);
   
   // Store original json method
   const originalJson = res.json;
@@ -87,13 +61,7 @@ const injectOrganizationAgents = async (req, res, next) => {
   res.json = async function(data) {
     try {
       // Only inject for the main agent list requests (not tools sub-endpoints)
-      const isMainAgentsList = req.method === 'GET' && (
-        (req.originalUrl?.includes('/api/agents?') && !req.originalUrl?.includes('/tools')) ||
-        req.originalUrl === '/api/agents' ||
-        (req.path === '/' && req.originalUrl?.includes('/api/agents') && !req.originalUrl?.includes('/tools'))
-      );
-      
-      logger.warn(`[AgentInjection] Checking injection condition: method=${req.method}, isMainAgentsList=${isMainAgentsList}, isArray=${Array.isArray(data)}`);
+      const isMainAgentsList = req.method === 'GET' && req.originalUrl?.includes('/api/agents') && !req.originalUrl?.includes('/tools');
       
       if (isMainAgentsList && Array.isArray(data)) {
         // Add cache-busting headers to prevent browser caching
