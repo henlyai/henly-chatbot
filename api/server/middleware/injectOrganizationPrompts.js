@@ -30,34 +30,18 @@ const formatPromptForLibreChat = (prompt) => ({
  * Middleware to inject organization prompts into prompt list responses
  */
 const injectOrganizationPrompts = async (req, res, next) => {
-  logger.warn(`[PromptInjection] ===== MIDDLEWARE CALLED =====`);
-  logger.warn(`[PromptInjection] Method: ${req.method}`);
-  logger.warn(`[PromptInjection] Original URL: ${req.originalUrl}`);
-  logger.warn(`[PromptInjection] Path: ${req.path}`);
-  logger.warn(`[PromptInjection] User ID: ${req.user?.id}`);
-  logger.warn(`[PromptInjection] Organization ID: ${req.user?.organization_id}`);
-  
   // Store original json method
   const originalJson = res.json;
   
   // Override res.json to inject our prompts
   res.json = async function(data) {
     try {
-      logger.warn(`[PromptInjection] ===== JSON RESPONSE INTERCEPTED =====`);
-      logger.warn(`[PromptInjection] Data type: ${typeof data}`);
-      logger.warn(`[PromptInjection] Data is array: ${Array.isArray(data)}`);
-      logger.warn(`[PromptInjection] Data length: ${Array.isArray(data) ? data.length : 'N/A'}`);
-      logger.warn(`[PromptInjection] Data sample:`, Array.isArray(data) ? data.slice(0, 2) : data);
-      
       // Only inject for main prompt list requests
       const isMainPromptsList = req.method === 'GET' && 
         req.originalUrl?.includes('/api/prompts') && 
         Array.isArray(data);
       
-      logger.warn(`[PromptInjection] Is main prompts list: ${isMainPromptsList}`);
-      logger.warn(`[PromptInjection] Method check: ${req.method === 'GET'}`);
-      logger.warn(`[PromptInjection] URL check: ${req.originalUrl?.includes('/api/prompts')}`);
-      logger.warn(`[PromptInjection] Data is array: ${Array.isArray(data)}`);
+      logger.warn(`[PromptInjection] Processing request: ${req.method} ${req.originalUrl}, isMainPromptsList: ${isMainPromptsList}`);
       
       if (isMainPromptsList) {
         logger.warn(`[PromptInjection] Processing prompt list request. User: ${req.user?.id}, Organization: ${req.user?.organization_id}`);

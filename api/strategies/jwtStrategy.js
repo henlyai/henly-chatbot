@@ -54,15 +54,22 @@ const jwtLogin = () =>
         if (user) {
           user.id = user._id.toString();
           
-          // Use role from JWT payload if available, otherwise default to USER
+          // Use role from JWT payload if available, otherwise default to ADMIN for organization users
           if (payload?.role) {
             user.role = payload.role;
             logger.info(`[jwtLogin] Using role from JWT payload: ${user.role}`);
             await updateUser(user.id, { role: user.role });
           } else if (!user.role) {
-            user.role = SystemRoles.USER;
+            // For organization users (those with organization_id), default to ADMIN role
+            // This ensures they have access to prompts, agents, and other features
+            if (payload?.organization?.id) {
+              user.role = SystemRoles.ADMIN;
+              logger.info(`[jwtLogin] Organization user detected, assigning ADMIN role`);
+            } else {
+              user.role = SystemRoles.USER;
+              logger.warn(`[jwtLogin] No organization context, defaulting to USER role`);
+            }
             await updateUser(user.id, { role: user.role });
-            logger.warn(`[jwtLogin] No role in JWT payload, defaulting to USER role`);
           }
           
           // Extract organization_id from JWT payload if available
