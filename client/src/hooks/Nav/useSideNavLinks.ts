@@ -61,6 +61,15 @@ export default function useSideNavLinks({
     permissionType: PermissionTypes.AGENTS,
     permission: Permissions.CREATE,
   });
+
+  // DEBUG: Log permission checks for agents and prompts
+  console.log('[useSideNavLinks DEBUG] Permission checks:', {
+    hasAccessToPrompts,
+    hasAccessToAgents,
+    hasAccessToCreateAgents,
+    endpointsConfig: endpointsConfig?.[EModelEndpoint.agents],
+    agentsDisableBuilder: endpointsConfig?.[EModelEndpoint.agents]?.disableBuilder
+  });
   const { data: startupConfig } = useGetStartupConfig();
 
   const Links = useMemo(() => {
@@ -84,12 +93,27 @@ export default function useSideNavLinks({
       });
     }
 
+    // DEBUG: Check agents link conditions
+    console.log('[useSideNavLinks DEBUG] Agents link conditions:', {
+      hasEndpointsConfig: !!endpointsConfig?.[EModelEndpoint.agents],
+      hasAccessToAgents,
+      hasAccessToCreateAgents,
+      disableBuilder: endpointsConfig?.[EModelEndpoint.agents]?.disableBuilder,
+      willShowAgents: !!(
+        endpointsConfig?.[EModelEndpoint.agents] &&
+        hasAccessToAgents &&
+        hasAccessToCreateAgents &&
+        endpointsConfig[EModelEndpoint.agents].disableBuilder !== true
+      )
+    });
+
     if (
       endpointsConfig?.[EModelEndpoint.agents] &&
       hasAccessToAgents &&
       hasAccessToCreateAgents &&
       endpointsConfig[EModelEndpoint.agents].disableBuilder !== true
     ) {
+      console.log('[useSideNavLinks DEBUG] Adding agents link to navigation');
       links.push({
         title: 'com_sidepanel_agent_builder',
         label: '',
@@ -99,7 +123,14 @@ export default function useSideNavLinks({
       });
     }
 
+    // DEBUG: Check prompts link conditions
+    console.log('[useSideNavLinks DEBUG] Prompts link conditions:', {
+      hasAccessToPrompts,
+      willShowPrompts: !!hasAccessToPrompts
+    });
+
     if (hasAccessToPrompts) {
+      console.log('[useSideNavLinks DEBUG] Adding prompts link to navigation');
       links.push({
         title: 'com_ui_prompts',
         label: '',
