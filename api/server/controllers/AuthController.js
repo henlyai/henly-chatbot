@@ -329,9 +329,9 @@ const ssoLibreChatController = async (req, res) => {
         if (profile.role) {
           // Map Supabase roles to LibreChat roles
           if (profile.role === 'super_admin' || profile.role === 'admin') {
-            supabaseUserRole = 'admin'; // Map to LibreChat admin role
+            supabaseUserRole = 'ADMIN'; // Map to LibreChat admin role (uppercase)
           } else {
-            supabaseUserRole = 'user'; // Map all other roles to LibreChat user role
+            supabaseUserRole = 'USER'; // Map all other roles to LibreChat user role (uppercase)
           }
           console.log('[SSO DEBUG] Mapped Supabase role', profile.role, 'to LibreChat role:', supabaseUserRole);
         }
