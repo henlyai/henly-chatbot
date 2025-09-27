@@ -25,12 +25,17 @@ const useHasAccess = ({
       permission: Permissions;
     }) => {
       if (!authContext) {
+        console.log('[useHasAccess DEBUG] No authContext');
         return false;
       }
 
       if (isAuthenticated && user?.role != null && roles && roles[user.role]) {
-        return roles[user.role]?.permissions?.[permissionType]?.[permission] === true;
+        const hasPermission = roles[user.role]?.permissions?.[permissionType]?.[permission] === true;
+        console.log(`[useHasAccess DEBUG] User: ${user.id}, Role: ${user.role}, Permission: ${permissionType}.${permission}, HasAccess: ${hasPermission}`);
+        console.log(`[useHasAccess DEBUG] Role permissions:`, roles[user.role]?.permissions);
+        return hasPermission;
       }
+      console.log('[useHasAccess DEBUG] No valid role found. User role:', user?.role, 'Roles available:', Object.keys(roles || {}));
       return false;
     },
     [authContext, isAuthenticated, roles],

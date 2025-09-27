@@ -60,6 +60,10 @@ function PromptsCommand({
     permission: Permissions.USE,
   });
 
+  // DEBUG: Log permission and API call status
+  console.log('[PromptsCommand DEBUG] hasAccess:', hasAccess);
+  console.log('[PromptsCommand DEBUG] Will make API call:', hasAccess);
+
   const { data, isLoading } = useGetAllPromptGroups(undefined, {
     enabled: hasAccess,
     select: (data) => {
