@@ -74,6 +74,7 @@ export default function useSideNavLinks({
 
   const Links = useMemo(() => {
     const links: NavLink[] = [];
+    console.log('[useSideNavLinks DEBUG] Starting to build navigation links...');
     if (
       isAssistantsEndpoint(endpoint) &&
       ((endpoint === EModelEndpoint.assistants &&
@@ -206,6 +207,7 @@ export default function useSideNavLinks({
       id: 'hide-panel',
     });
 
+    console.log('[useSideNavLinks DEBUG] Final navigation links:', links.map(l => ({ id: l.id, title: l.title })));
     return links;
   }, [
     endpointsConfig,
