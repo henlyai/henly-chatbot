@@ -45,11 +45,7 @@ const checkGlobalPromptShare = generateCheckAccess({
 });
 
 router.use(requireJwtAuth);
-router.use(debugUserContext);
-router.use(debugMiddlewareExecution);
 router.use(injectOrganizationPrompts);
-router.use(syncPromptsToSupabase);
-router.use(debugLibreChatAPI);
 
 /**
  * Route to get single prompt group by its ID

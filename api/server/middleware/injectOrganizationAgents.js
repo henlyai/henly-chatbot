@@ -6,130 +6,59 @@
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('@librechat/data-schemas');
 
-    // Use service role key for server-side operations to bypass RLS
-    console.log('[AgentInjection] Environment variables check:', {
-      hasSupabaseUrl: !!process.env.SUPABASE_URL,
-      hasSupabaseAnonKey: !!process.env.SUPABASE_ANON_KEY,
-      hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      serviceRoleKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.length : 0,
-      serviceRoleKeyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + '...' : 'none'
-    });
+// Initialize Supabase client with service role key if available
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
+);
 
-    if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      console.log('[AgentInjection] Service role key details:', {
-        keyLength: process.env.SUPABASE_SERVICE_ROLE_KEY.length,
-        keyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 30) + '...',
-        keySuffix: '...' + process.env.SUPABASE_SERVICE_ROLE_KEY.substring(process.env.SUPABASE_SERVICE_ROLE_KEY.length - 10),
-        supabaseUrl: process.env.SUPABASE_URL,
-        urlPrefix: process.env.SUPABASE_URL?.substring(0, 30) + '...'
-      });
-      
-      // Additional debugging for service role key format
-      console.log('[AgentInjection] Service role key format analysis:', {
-        startsWithEy: process.env.SUPABASE_SERVICE_ROLE_KEY.startsWith('eyJ'),
-        containsDots: process.env.SUPABASE_SERVICE_ROLE_KEY.includes('.'),
-        hasThreeParts: process.env.SUPABASE_SERVICE_ROLE_KEY.split('.').length === 3,
-        firstPartLength: process.env.SUPABASE_SERVICE_ROLE_KEY.split('.')[0]?.length || 0,
-        secondPartLength: process.env.SUPABASE_SERVICE_ROLE_KEY.split('.')[1]?.length || 0,
-        thirdPartLength: process.env.SUPABASE_SERVICE_ROLE_KEY.split('.')[2]?.length || 0
-      });
-    }
-
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+/**
+ * Format Supabase agent for LibreChat
+ */
+const formatAgentForLibreChat = (agent) => ({
+  id: agent.id,
+  name: agent.name,
+  description: agent.description || '',
+  instructions: agent.instructions || '',
+  model: agent.model || 'gpt-4',
+  provider: agent.provider || 'openai',
+  tools: agent.tools || [],
+  conversation_starters: agent.conversation_starters || [],
+  model_parameters: agent.model_parameters || {},
+  avatar: agent.avatar_url || null,
+  created_at: agent.created_at,
+  updated_at: agent.updated_at
+});
 
 /**
  * Middleware to inject organization agents into agent list responses
- * Works exactly like MCP injection - intercepts the response and adds our agents
  */
 const injectOrganizationAgents = async (req, res, next) => {
-  // Comprehensive logging
-  logger.warn(`[AgentInjection] ===== MIDDLEWARE CALLED =====`);
-  logger.warn(`[AgentInjection] Method: ${req.method}`);
-  logger.warn(`[AgentInjection] Original URL: ${req.originalUrl}`);
-  logger.warn(`[AgentInjection] Path: ${req.path}`);
-  logger.warn(`[AgentInjection] Query:`, req.query);
-  logger.warn(`[AgentInjection] User ID: ${req.user?.id}`);
-  logger.warn(`[AgentInjection] Organization ID: ${req.user?.organization_id}`);
-  logger.warn(`[AgentInjection] User Role: ${req.user?.role}`);
-  
   // Store original json method
   const originalJson = res.json;
   
   // Override res.json to inject our agents
   res.json = async function(data) {
     try {
-      logger.warn(`[AgentInjection] ===== JSON RESPONSE INTERCEPTED =====`);
-      logger.warn(`[AgentInjection] Data type: ${typeof data}`);
-      logger.warn(`[AgentInjection] Data is array: ${Array.isArray(data)}`);
-      logger.warn(`[AgentInjection] Data length: ${Array.isArray(data) ? data.length : 'N/A'}`);
-      logger.warn(`[AgentInjection] Data sample:`, Array.isArray(data) ? data.slice(0, 2) : data);
+      // Only inject for main agent list requests
+      const isMainAgentsList = req.method === 'GET' && 
+        req.originalUrl?.includes('/api/agents') && 
+        !req.originalUrl?.includes('/tools') &&
+        Array.isArray(data);
       
-      // Only inject for the main agent list requests (not tools sub-endpoints)
-      const isMainAgentsList = req.method === 'GET' && req.originalUrl?.includes('/api/agents') && !req.originalUrl?.includes('/tools');
-      
-      logger.warn(`[AgentInjection] Is main agents list: ${isMainAgentsList}`);
-      logger.warn(`[AgentInjection] Method check: ${req.method === 'GET'}`);
-      logger.warn(`[AgentInjection] URL check: ${req.originalUrl?.includes('/api/agents')}`);
-      logger.warn(`[AgentInjection] Not tools check: ${!req.originalUrl?.includes('/tools')}`);
-      
-      if (isMainAgentsList && Array.isArray(data)) {
-        // Add cache-busting headers to prevent browser caching
+      if (isMainAgentsList) {
+        logger.warn(`[AgentInjection] Processing agent list request. User: ${req.user?.id}, Organization: ${req.user?.organization_id}`);
+        
+        // Add cache-busting headers
         res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.set('Pragma', 'no-cache');
         res.set('Expires', '0');
-        const organizationId = req.user?.organization_id;
-        logger.warn(`[AgentInjection] Processing agent list request. User: ${req.user?.id}, Organization: ${organizationId}, Data type: ${typeof data}, Is array: ${Array.isArray(data)}`);
         
-        // DEBUG: Log the entire req.user object to see what's available
-        logger.warn(`[AgentInjection] Full req.user object:`, JSON.stringify(req.user, null, 2));
-        logger.warn(`[AgentInjection] req.user keys:`, Object.keys(req.user || {}));
-        logger.warn(`[AgentInjection] req.user.organization_id type:`, typeof req.user?.organization_id);
-        logger.warn(`[AgentInjection] req.user.organization_id value:`, req.user?.organization_id);
+        const organizationId = req.user?.organization_id;
         
         if (organizationId) {
-          logger.warn(`[AgentInjection] Injecting agents for organization: ${organizationId}`);
+          logger.warn(`[AgentInjection] Fetching agents for organization: ${organizationId}`);
           
-              // First, test if the agent_library table exists
-              try {
-                const { data: testData, error: testError } = await supabase
-                  .from('agent_library')
-                  .select('id')
-                  .limit(1);
-
-                console.log('[AgentInjection] Table existence test:', {
-                  hasTestData: !!testData,
-                  testError: testError?.message || 'none',
-                  testErrorCode: testError?.code || 'none'
-                });
-              } catch (testErr) {
-                console.log('[AgentInjection] Table existence test failed:', testErr.message);
-              }
-              
-              // Test basic Supabase authentication with service role key
-              try {
-                const { data: authTestData, error: authTestError } = await supabase
-                  .from('profiles')
-                  .select('id')
-                  .limit(1);
-
-                console.log('[AgentInjection] Service role auth test:', {
-                  hasAuthTestData: !!authTestData,
-                  authTestError: authTestError?.message || 'none',
-                  authTestErrorCode: authTestError?.code || 'none'
-                });
-              } catch (authTestErr) {
-                console.log('[AgentInjection] Service role auth test failed:', authTestErr.message);
-              }
-
           // Fetch organization agents from Supabase
           const { data: orgAgents, error } = await supabase
             .from('agent_library')
@@ -144,138 +73,21 @@ const injectOrganizationAgents = async (req, res, next) => {
             data.unshift(...formattedAgents);
             
             logger.warn(`[AgentInjection] ✅ Added ${formattedAgents.length} organization agents: ${formattedAgents.map(a => a.name).join(', ')}`);
-            logger.warn(`[AgentInjection] Final data length: ${data.length}`);
           } else {
             logger.warn(`[AgentInjection] ❌ No agents found or error occurred for organization ${organizationId}`);
           }
         } else {
           logger.warn(`[AgentInjection] ❌ No organization_id found in request`);
         }
-      } else {
-        logger.warn(`[AgentInjection] ⚠️  Skipping injection - not main agents list or not array`);
       }
     } catch (error) {
-      logger.error('[AgentInjection] Error in injection logic:', error);
+      logger.error('[AgentInjection] Error injecting agents:', error);
     }
     
-    logger.warn(`[AgentInjection] ===== CALLING ORIGINAL JSON METHOD =====`);
     return originalJson.call(this, data);
   };
   
   next();
 };
-
-/**
- * Format Supabase agent for LibreChat using stored configuration
- */
-function formatAgentForLibreChat(supabaseAgent) {
-  return {
-    _id: supabaseAgent.id,
-    id: supabaseAgent.id,
-    name: supabaseAgent.name,
-    description: supabaseAgent.description,
-    instructions: supabaseAgent.instructions || buildInstructions(supabaseAgent),
-    model: supabaseAgent.model || getModelForCategory(supabaseAgent.category),
-    provider: supabaseAgent.provider || getProviderForCategory(supabaseAgent.category),
-    tools: supabaseAgent.tools || getToolsForCategory(supabaseAgent.category),
-    model_parameters: supabaseAgent.model_parameters || getModelParameters(supabaseAgent.category),
-    conversation_starters: supabaseAgent.conversation_starters || getConversationStarters(supabaseAgent),
-    avatar: supabaseAgent.avatar_url ? { 
-      source: 'url', 
-      filepath: supabaseAgent.avatar_url 
-    } : null,
-    author: supabaseAgent.created_by,
-    authorName: 'Henly AI', // Could be fetched from profiles table
-    createdAt: supabaseAgent.created_at,
-    updatedAt: supabaseAgent.updated_at,
-    // LibreChat agent configuration
-    access_level: supabaseAgent.access_level || 1,
-    recursion_limit: supabaseAgent.recursion_limit || 25,
-    artifacts: supabaseAgent.artifacts || 'auto',
-    hide_sequential_outputs: supabaseAgent.hide_sequential_outputs || false,
-    end_after_tools: supabaseAgent.end_after_tools || false,
-    // Mark as organization agent
-    isOrgAgent: true,
-    category: supabaseAgent.category,
-    // LibreChat expects versions array
-    versions: [{
-      name: supabaseAgent.name,
-      description: supabaseAgent.description,
-      instructions: supabaseAgent.instructions || buildInstructions(supabaseAgent),
-      model: supabaseAgent.model || getModelForCategory(supabaseAgent.category),
-      provider: supabaseAgent.provider || getProviderForCategory(supabaseAgent.category),
-      tools: supabaseAgent.tools || getToolsForCategory(supabaseAgent.category),
-      createdAt: supabaseAgent.created_at,
-      updatedAt: supabaseAgent.updated_at
-    }]
-  };
-}
-
-function buildInstructions(agent) {
-  return `You are ${agent.name}. ${agent.description}\n\nProvide helpful, professional assistance in your area of expertise.`;
-}
-
-function getModelForCategory(category) {
-  const modelMap = {
-    'sales_marketing': 'claude-3-sonnet-20240229',
-    'customer_support': 'gpt-4-turbo-preview',
-    'content_creation': 'claude-3-sonnet-20240229',
-    'data_analytics': 'gpt-4-turbo-preview'
-  };
-  return modelMap[category] || 'gpt-4-turbo-preview';
-}
-
-function getProviderForCategory(category) {
-  const model = getModelForCategory(category);
-  return model.includes('claude') ? 'anthropic' : 'openai';
-}
-
-function getToolsForCategory(category) {
-  const toolMap = {
-    'sales_marketing': ['Google Drive', 'HubSpot'],
-    'customer_support': ['Zendesk', 'Slack'],
-    'content_creation': ['Google Drive'],
-    'data_analytics': ['Google Drive', 'BigQuery']
-  };
-  return toolMap[category] || ['Google Drive'];
-}
-
-function getModelParameters(category) {
-  const parameterMap = {
-    'sales_marketing': { temperature: 0.7, max_tokens: 2000 },
-    'customer_support': { temperature: 0.3, max_tokens: 1500 },
-    'content_creation': { temperature: 0.8, max_tokens: 3000 },
-    'data_analytics': { temperature: 0.2, max_tokens: 2000 },
-    'project_management': { temperature: 0.4, max_tokens: 1500 },
-    'operations': { temperature: 0.3, max_tokens: 1500 },
-    'hr_recruitment': { temperature: 0.5, max_tokens: 1500 },
-    'finance_accounting': { temperature: 0.1, max_tokens: 2000 }
-  };
-  return parameterMap[category] || { temperature: 0.5, max_tokens: 1500 };
-}
-
-function getConversationStarters(agent) {
-  const starterMap = {
-    'sales_marketing': [
-      "Help me qualify this lead and determine next steps",
-      "Create a proposal for a new client opportunity",
-      "Analyze our sales pipeline and suggest improvements"
-    ],
-    'customer_support': [
-      "Help me troubleshoot a client's technical issue",
-      "Draft a response to a customer complaint",
-      "Create onboarding materials for new users"
-    ],
-    'content_creation': [
-      "Create a blog post outline about AI trends",
-      "Write social media content for our latest feature",
-      "Develop a case study from client success data"
-    ]
-  };
-  return starterMap[agent.category] || [
-    `How can I help you with ${agent.category?.replace('_', ' ')} tasks?`,
-    "What would you like to work on today?"
-  ];
-}
 
 module.exports = injectOrganizationAgents;
