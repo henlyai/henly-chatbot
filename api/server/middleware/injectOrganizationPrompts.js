@@ -41,6 +41,11 @@ const injectOrganizationPrompts = async (req, res, next) => {
         req.originalUrl?.includes('/api/prompts') && 
         Array.isArray(data);
       
+      logger.warn(`[PromptInjection] Is main prompts list: ${isMainPromptsList}`);
+      logger.warn(`[PromptInjection] Method check: ${req.method === 'GET'}`);
+      logger.warn(`[PromptInjection] URL check: ${req.originalUrl?.includes('/api/prompts')}`);
+      logger.warn(`[PromptInjection] Data is array: ${Array.isArray(data)}`);
+      
       if (isMainPromptsList) {
         logger.warn(`[PromptInjection] Processing prompt list request. User: ${req.user?.id}, Organization: ${req.user?.organization_id}`);
         

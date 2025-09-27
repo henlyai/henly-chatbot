@@ -59,12 +59,13 @@ const injectOrganizationAgents = async (req, res, next) => {
       const isMainAgentsList = req.method === 'GET' && 
         req.originalUrl?.includes('/api/agents') && 
         !req.originalUrl?.includes('/tools') &&
-        Array.isArray(data);
+        data && typeof data === 'object' && Array.isArray(data.data);
       
       logger.warn(`[AgentInjection] Is main agents list: ${isMainAgentsList}`);
       logger.warn(`[AgentInjection] Method check: ${req.method === 'GET'}`);
       logger.warn(`[AgentInjection] URL check: ${req.originalUrl?.includes('/api/agents')}`);
       logger.warn(`[AgentInjection] Not tools check: ${!req.originalUrl?.includes('/tools')}`);
+      logger.warn(`[AgentInjection] Data has data array: ${data && typeof data === 'object' && Array.isArray(data.data)}`);
       
       if (isMainAgentsList) {
         logger.warn(`[AgentInjection] Processing agent list request. User: ${req.user?.id}, Organization: ${req.user?.organization_id}`);
@@ -90,7 +91,7 @@ const injectOrganizationAgents = async (req, res, next) => {
           if (!error && orgAgents?.length > 0) {
             // Format for LibreChat and prepend to existing agents
             const formattedAgents = orgAgents.map(formatAgentForLibreChat);
-            data.unshift(...formattedAgents);
+            data.data.unshift(...formattedAgents);
             
             logger.warn(`[AgentInjection] ✅ Added ${formattedAgents.length} organization agents: ${formattedAgents.map(a => a.name).join(', ')}`);
           } else {
