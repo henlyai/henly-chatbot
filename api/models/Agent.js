@@ -300,12 +300,12 @@ const loadAgent = async ({ req, agent_id, endpoint, model_parameters }) => {
   }
 
   // Check if this is an organization agent (from Supabase) - these should be accessible to all org users
-  if (agent.isCollaborative && !agent.projectIds) {
-    logger.warn(`[Agent] ✅ Organization agent detected (isCollaborative=true, no projectIds) - allowing access`);
+  if (agent.isCollaborative && (!agent.projectIds || agent.projectIds.length === 0)) {
+    logger.warn(`[Agent] ✅ Organization agent detected (isCollaborative=true, empty/no projectIds) - allowing access`);
     return agent;
   }
 
-  if (!agent.projectIds) {
+  if (!agent.projectIds || agent.projectIds.length === 0) {
     logger.warn(`[Agent] ❌ No projectIds and not an organization agent - denying access`);
     return null;
   }
