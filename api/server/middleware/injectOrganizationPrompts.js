@@ -37,7 +37,7 @@ const formatPromptForLibreChat = (prompt) => ({
   updatedAt: prompt.updated_at,
   // Additional fields that might be expected
   command: prompt.command || prompt.name.toLowerCase().replace(/\s+/g, '-'),
-  isPublic: false,
+  isPublic: true, // Set to true so organization prompts are visible to all users
   tags: prompt.variables || []
 });
 
@@ -61,10 +61,12 @@ const injectOrganizationPrompts = async (req, res, next) => {
       if (isMainPromptsList) {
         logger.warn(`[PromptInjection] Processing prompt list request. User: ${req.user?.id}, Organization: ${req.user?.organization_id}`);
         
-        // Add cache-busting headers
-        res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+        // Add aggressive cache-busting headers
+        res.set('Cache-Control', 'no-cache, no-store, must-revalidate, private');
         res.set('Pragma', 'no-cache');
         res.set('Expires', '0');
+        res.set('Last-Modified', new Date().toUTCString());
+        res.set('ETag', `"${Date.now()}"`);
         
         const organizationId = req.user?.organization_id;
         
