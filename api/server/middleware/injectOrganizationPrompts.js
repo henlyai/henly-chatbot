@@ -52,11 +52,20 @@ const injectOrganizationPrompts = async (req, res, next) => {
   res.json = async function(data) {
     try {
       // Only inject for main prompt list requests (both /all and /groups endpoints)
-      const isMainPromptsList = req.method === 'GET' &&
-        (req.originalUrl?.includes('/api/prompts/all') || req.originalUrl?.includes('/api/prompts/groups')) &&
-        Array.isArray(data);
+      const isAllEndpoint = req.method === 'GET' && req.originalUrl?.includes('/api/prompts/all') && Array.isArray(data);
+      const isGroupsEndpoint = req.method === 'GET' && req.originalUrl?.includes('/api/prompts/groups') && data && typeof data === 'object' && Array.isArray(data.promptGroups);
+      const isMainPromptsList = isAllEndpoint || isGroupsEndpoint;
       
       logger.warn(`[PromptInjection] Processing request: ${req.method} ${req.originalUrl}, isMainPromptsList: ${isMainPromptsList}`);
+      logger.warn(`[PromptInjection] Request details:`, {
+        method: req.method,
+        originalUrl: req.originalUrl,
+        path: req.path,
+        query: req.query,
+        dataType: typeof data,
+        dataIsArray: Array.isArray(data),
+        dataLength: Array.isArray(data) ? data.length : 'N/A'
+      });
       
       if (isMainPromptsList) {
         logger.warn(`[PromptInjection] Processing prompt list request. User: ${req.user?.id}, Organization: ${req.user?.organization_id}`);
@@ -84,13 +93,23 @@ const injectOrganizationPrompts = async (req, res, next) => {
           if (!error && orgPrompts?.length > 0) {
             // Format for LibreChat and prepend to existing prompts
             const formattedPrompts = orgPrompts.map(formatPromptForLibreChat);
-            data.unshift(...formattedPrompts);
+            
+            if (isAllEndpoint) {
+              // For /api/prompts/all - data is an array
+              data.unshift(...formattedPrompts);
+              logger.warn(`[PromptInjection] ✅ Added ${formattedPrompts.length} organization prompts to /all endpoint`);
+            } else if (isGroupsEndpoint) {
+              // For /api/prompts/groups - data is an object with promptGroups array
+              data.promptGroups.unshift(...formattedPrompts);
+              logger.warn(`[PromptInjection] ✅ Added ${formattedPrompts.length} organization prompts to /groups endpoint`);
+            }
             
             logger.warn(`[PromptInjection] ✅ Added ${formattedPrompts.length} organization prompts: ${formattedPrompts.map(p => p.name).join(', ')}`);
             logger.warn(`[PromptInjection] Final data structure:`, {
-              totalPrompts: data.length,
-              firstPrompt: data[0],
-              dataKeys: Object.keys(data[0] || {})
+              endpoint: isAllEndpoint ? '/all' : '/groups',
+              totalPrompts: isAllEndpoint ? data.length : data.promptGroups?.length,
+              firstPrompt: isAllEndpoint ? data[0] : data.promptGroups?.[0],
+              dataKeys: Object.keys(isAllEndpoint ? (data[0] || {}) : (data.promptGroups?.[0] || {}))
             });
           } else {
             logger.warn(`[PromptInjection] ❌ No prompts found or error occurred for organization ${organizationId}`);
