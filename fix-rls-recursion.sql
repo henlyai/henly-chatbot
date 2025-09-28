@@ -101,3 +101,4 @@ FROM pg_policies
 WHERE tablename IN ('profiles', 'agent_library', 'prompt_library')
 AND schemaname = 'public'
 ORDER BY tablename, policyname;
+

@@ -30,3 +30,4 @@ WHERE table_schema = 'public'
 AND table_name IN ('organization_models', 'organization_tools');
 
 -- Should return no rows if cleanup was successful
+

@@ -13,17 +13,32 @@ const supabase = createClient(
 );
 
 /**
- * Format Supabase prompt for LibreChat
+ * Format Supabase prompt for LibreChat TPromptGroup structure
  */
 const formatPromptForLibreChat = (prompt) => ({
-  id: prompt.id,
+  _id: prompt.id, // LibreChat expects _id for MongoDB ObjectId
   name: prompt.name,
-  description: prompt.description || '',
-  prompt_text: prompt.prompt_text || '',
+  oneliner: prompt.description || '', // LibreChat expects oneliner for short description
   category: prompt.category || 'general',
-  variables: prompt.variables || [],
-  created_at: prompt.created_at,
-  updated_at: prompt.updated_at
+  author: prompt.created_by || 'system', // User who created the prompt
+  projectIds: [], // Empty array for organization prompts
+  productionPrompt: {
+    prompt: prompt.prompt_text || '', // LibreChat expects productionPrompt.prompt
+    _id: `${prompt.id}_prod`
+  },
+  prompts: [
+    {
+      _id: `${prompt.id}_prompt`,
+      prompt: prompt.prompt_text || '',
+      type: 'text'
+    }
+  ],
+  createdAt: prompt.created_at,
+  updatedAt: prompt.updated_at,
+  // Additional fields that might be expected
+  command: prompt.command || prompt.name.toLowerCase().replace(/\s+/g, '-'),
+  isPublic: false,
+  tags: prompt.variables || []
 });
 
 /**

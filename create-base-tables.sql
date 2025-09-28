@@ -255,3 +255,4 @@ FROM pg_policies
 WHERE tablename IN ('agent_library', 'prompt_library')
 AND schemaname = 'public'
 ORDER BY tablename, policyname;
+

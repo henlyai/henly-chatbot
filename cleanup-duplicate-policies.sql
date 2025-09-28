@@ -52,3 +52,4 @@ ORDER BY tablename, policyname;
 -- - profiles: 1 policy ("Users can access their own profile")
 -- - agent_library: 4 policies (SELECT, INSERT, UPDATE, DELETE)
 -- - prompt_library: 4 policies (SELECT, INSERT, UPDATE, DELETE)
+
