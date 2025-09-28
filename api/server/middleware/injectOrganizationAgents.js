@@ -15,23 +15,57 @@ const supabase = createClient(
 /**
  * Format Supabase agent for LibreChat
  */
-const formatAgentForLibreChat = (agent) => ({
-  id: agent.id,
-  name: agent.name,
-  description: agent.description || '',
-  instructions: agent.instructions || '',
-  model: agent.model || 'gpt-4',
-  provider: agent.provider || 'openai',
-  tools: agent.tools || [],
-  conversation_starters: agent.conversation_starters || [],
-  model_parameters: agent.model_parameters || {},
-  avatar: agent.avatar_url || null,
-  created_at: agent.created_at,
-  updated_at: agent.updated_at
-});
+const formatAgentForLibreChat = (agent) => {
+  // Parse JSON fields if they're strings
+  let tools = [];
+  let conversation_starters = [];
+  let model_parameters = {};
+  
+  try {
+    tools = typeof agent.tools === 'string' ? JSON.parse(agent.tools) : (agent.tools || []);
+  } catch (e) {
+    logger.warn(`[AgentInjection] Error parsing tools for agent ${agent.name}:`, e.message);
+  }
+  
+  try {
+    conversation_starters = typeof agent.conversation_starters === 'string' ? 
+      JSON.parse(agent.conversation_starters) : (agent.conversation_starters || []);
+  } catch (e) {
+    logger.warn(`[AgentInjection] Error parsing conversation_starters for agent ${agent.name}:`, e.message);
+  }
+  
+  try {
+    model_parameters = typeof agent.model_parameters === 'string' ? 
+      JSON.parse(agent.model_parameters) : (agent.model_parameters || {});
+  } catch (e) {
+    logger.warn(`[AgentInjection] Error parsing model_parameters for agent ${agent.name}:`, e.message);
+  }
+
+  return {
+    id: agent.librechat_agent_id || agent.id, // Use librechat_agent_id as the primary ID
+    name: agent.name,
+    description: agent.description || '',
+    instructions: agent.instructions || '',
+    model: agent.model || 'gpt-4',
+    provider: agent.provider || 'openai',
+    tools: tools,
+    conversation_starters: conversation_starters,
+    model_parameters: model_parameters,
+    avatar: agent.avatar_url || null,
+    created_at: agent.created_at,
+    updated_at: agent.updated_at,
+    // Additional LibreChat fields
+    author: agent.created_by,
+    version: 1,
+    isCollaborative: true,
+    projectIds: [],
+    access_level: agent.access_level || 1,
+    recursion_limit: agent.recursion_limit || 25
+  };
+};
 
 /**
- * Middleware to inject organization agents into agent list responses
+ * Middleware to inject organization agents into agent list responses and handle agent lookups
  */
 const injectOrganizationAgents = async (req, res, next) => {
   logger.warn(`[AgentInjection] ===== MIDDLEWARE CALLED =====`);
@@ -42,6 +76,47 @@ const injectOrganizationAgents = async (req, res, next) => {
   logger.warn(`[AgentInjection] User ID: ${req.user?.id}`);
   logger.warn(`[AgentInjection] Organization ID: ${req.user?.organization_id}`);
   logger.warn(`[AgentInjection] User Role: ${req.user?.role}`);
+  
+  // Check if this is a single agent lookup request (GET /api/agents/:id)
+  const isSingleAgentLookup = req.method === 'GET' && 
+    req.originalUrl?.includes('/api/agents/') && 
+    !req.originalUrl?.includes('/api/agents/tools') &&
+    req.params?.id;
+  
+  if (isSingleAgentLookup) {
+    logger.warn(`[AgentInjection] Single agent lookup for ID: ${req.params.id}`);
+    
+    const organizationId = req.user?.organization_id;
+    if (organizationId) {
+      try {
+        // Try to find the agent in organization's agent_library
+        const { data: orgAgent, error } = await supabase
+          .from('agent_library')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .eq('librechat_agent_id', req.params.id)
+          .single();
+
+        if (!error && orgAgent) {
+          logger.warn(`[AgentInjection] ✅ Found organization agent: ${orgAgent.name}`);
+          
+          // Format for LibreChat and return it
+          const formattedAgent = formatAgentForLibreChat(orgAgent);
+          
+          // Add cache-busting headers
+          res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.set('Pragma', 'no-cache');
+          res.set('Expires', '0');
+          
+          return res.json(formattedAgent);
+        } else {
+          logger.warn(`[AgentInjection] ❌ Organization agent not found for ID: ${req.params.id}, Error: ${error?.message || 'none'}`);
+        }
+      } catch (error) {
+        logger.error('[AgentInjection] Error looking up organization agent:', error);
+      }
+    }
+  }
   
   // Store original json method
   const originalJson = res.json;
