@@ -75,6 +75,18 @@ const initializeClient = async ({ req, res, endpointOption }) => {
   
   logger.warn('[AgentInit] Primary agent resolved:', primaryAgent ? `✅ ${primaryAgent.name} (ID: ${primaryAgent.id})` : '❌ null');
   
+  if (primaryAgent) {
+    logger.warn('[AgentInit] ✅ Agent details:', {
+      id: primaryAgent.id,
+      name: primaryAgent.name,
+      model: primaryAgent.model,
+      provider: primaryAgent.provider,
+      isCollaborative: primaryAgent.isCollaborative,
+      projectIds: primaryAgent.projectIds,
+      author: primaryAgent.author
+    });
+  }
+
   if (!primaryAgent) {
     logger.error('[AgentInit] ❌ Agent not found - primaryAgent is null/undefined');
     throw new Error('Agent not found');
