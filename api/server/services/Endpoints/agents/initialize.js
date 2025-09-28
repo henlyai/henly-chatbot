@@ -63,12 +63,20 @@ const initializeClient = async ({ req, res, endpointOption }) => {
   });
 
   if (!endpointOption.agent) {
+    logger.error('[AgentInit] ❌ No agent promise provided in endpointOption');
     throw new Error('No agent promise provided');
   }
 
+  logger.warn('[AgentInit] ===== RESOLVING AGENT PROMISE =====');
+  logger.warn('[AgentInit] endpointOption.agent type:', typeof endpointOption.agent);
+  
   const primaryAgent = await endpointOption.agent;
   delete endpointOption.agent;
+  
+  logger.warn('[AgentInit] Primary agent resolved:', primaryAgent ? `✅ ${primaryAgent.name} (ID: ${primaryAgent.id})` : '❌ null');
+  
   if (!primaryAgent) {
+    logger.error('[AgentInit] ❌ Agent not found - primaryAgent is null/undefined');
     throw new Error('Agent not found');
   }
 

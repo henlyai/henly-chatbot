@@ -107,18 +107,23 @@ const createAgent = async (agentData) => {
  * @returns {Promise<Agent|null>} The agent document as a plain object, or null if not found.
  */
 const getAgent = async (searchParameter) => {
+  logger.warn(`[Agent] ===== getAgent CALLED =====`);
+  logger.warn(`[Agent] Search parameters:`, JSON.stringify(searchParameter, null, 2));
+  
   // First try to find the agent in LibreChat's MongoDB database
   const mongoAgent = await Agent.findOne(searchParameter).lean();
   
   if (mongoAgent) {
-    logger.debug(`[Agent] Found agent in MongoDB: ${mongoAgent.id}`);
+    logger.warn(`[Agent] ✅ Found agent in MongoDB: ${mongoAgent.id} (${mongoAgent.name})`);
     return mongoAgent;
   }
+  
+  logger.warn(`[Agent] ❌ Agent not found in MongoDB`);
   
   // If not found in MongoDB and we have an ID, check Supabase for organization agents
   if (searchParameter.id) {
     try {
-      logger.debug(`[Agent] Agent not found in MongoDB, checking Supabase for ID: ${searchParameter.id}`);
+      logger.warn(`[Agent] 🔍 Checking Supabase for organization agent with ID: ${searchParameter.id}`);
       
       // Try to find by librechat_agent_id first, then by regular id
       let { data: supabaseAgent, error } = await supabase
@@ -128,8 +133,11 @@ const getAgent = async (searchParameter) => {
         .eq('is_active', true)
         .single();
 
+      logger.warn(`[Agent] Supabase query 1 (by librechat_agent_id): Error=${error?.message || 'none'}, Found=${!!supabaseAgent}`);
+
       // If not found by librechat_agent_id, try by regular id
       if (error || !supabaseAgent) {
+        logger.warn(`[Agent] Trying Supabase query 2 (by regular id)...`);
         const { data: supabaseAgentById, error: errorById } = await supabase
           .from('agent_library')
           .select('*')
@@ -137,31 +145,57 @@ const getAgent = async (searchParameter) => {
           .eq('is_active', true)
           .single();
         
+        logger.warn(`[Agent] Supabase query 2 (by id): Error=${errorById?.message || 'none'}, Found=${!!supabaseAgentById}`);
+        
         supabaseAgent = supabaseAgentById;
         error = errorById;
       }
 
       if (!error && supabaseAgent) {
-        logger.debug(`[Agent] Found organization agent in Supabase: ${supabaseAgent.name} (ID: ${supabaseAgent.id})`);
+        logger.warn(`[Agent] ✅ Found organization agent in Supabase: ${supabaseAgent.name} (ID: ${supabaseAgent.id}, LibreChatID: ${supabaseAgent.librechat_agent_id})`);
         
         // Format the Supabase agent for LibreChat compatibility
         const formattedAgent = formatSupabaseAgentForLibreChat(supabaseAgent);
+        logger.warn(`[Agent] Formatted agent for LibreChat:`, JSON.stringify({
+          id: formattedAgent.id,
+          name: formattedAgent.name,
+          model: formattedAgent.model,
+          provider: formattedAgent.provider
+        }, null, 2));
         
         // If author is specified in search, verify access
         if (searchParameter.author && supabaseAgent.created_by !== searchParameter.author) {
-          logger.debug(`[Agent] Author mismatch for Supabase agent. Requested: ${searchParameter.author}, Agent author: ${supabaseAgent.created_by}`);
+          logger.warn(`[Agent] ❌ Author mismatch for Supabase agent. Requested: ${searchParameter.author}, Agent author: ${supabaseAgent.created_by}`);
           return null;
         }
         
+        logger.warn(`[Agent] ✅ Returning formatted Supabase agent`);
         return formattedAgent;
       } else {
-        logger.debug(`[Agent] Organization agent not found in Supabase for ID: ${searchParameter.id}`);
+        logger.warn(`[Agent] ❌ Organization agent not found in Supabase for ID: ${searchParameter.id}, Error: ${error?.message || 'none'}`);
+        
+        // Let's also check what agents ARE available in Supabase for debugging
+        const { data: allAgents, error: allError } = await supabase
+          .from('agent_library')
+          .select('id, librechat_agent_id, name, is_active')
+          .eq('is_active', true)
+          .limit(10);
+          
+        if (!allError && allAgents?.length > 0) {
+          logger.warn(`[Agent] Available agents in Supabase:`);
+          allAgents.forEach(agent => {
+            logger.warn(`[Agent] - ID: ${agent.id}, LibreChatID: ${agent.librechat_agent_id}, Name: ${agent.name}`);
+          });
+        }
       }
     } catch (error) {
       logger.error('[Agent] Error checking Supabase for organization agent:', error);
     }
+  } else {
+    logger.warn(`[Agent] ❌ No ID provided in search parameters, cannot check Supabase`);
   }
   
+  logger.warn(`[Agent] ❌ Returning null - agent not found anywhere`);
   return null;
 };
 
@@ -233,19 +267,30 @@ const loadEphemeralAgent = async ({ req, agent_id, endpoint, model_parameters: _
  * @returns {Promise<Agent|null>} The agent document as a plain object, or null if not found.
  */
 const loadAgent = async ({ req, agent_id, endpoint, model_parameters }) => {
+  logger.warn(`[Agent] ===== loadAgent CALLED =====`);
+  logger.warn(`[Agent] Parameters: agent_id=${agent_id}, endpoint=${endpoint}, user_id=${req?.user?.id}`);
+  
   if (!agent_id) {
+    logger.warn(`[Agent] ❌ No agent_id provided to loadAgent`);
     return null;
   }
   if (agent_id === EPHEMERAL_AGENT_ID) {
+    logger.warn(`[Agent] Loading ephemeral agent`);
     return await loadEphemeralAgent({ req, agent_id, endpoint, model_parameters });
   }
+  
+  logger.warn(`[Agent] Calling getAgent with ID: ${agent_id}`);
   const agent = await getAgent({
     id: agent_id,
   });
 
   if (!agent) {
+    logger.warn(`[Agent] ❌ loadAgent: getAgent returned null for ID: ${agent_id}`);
     return null;
   }
+  
+  logger.warn(`[Agent] ✅ loadAgent: getAgent found agent: ${agent.name} (ID: ${agent.id})`);
+  logger.warn(`[Agent] Agent author: ${agent.author}, Request user: ${req?.user?.id}`);
 
   agent.version = agent.versions ? agent.versions.length : 0;
 
