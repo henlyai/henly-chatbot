@@ -295,10 +295,18 @@ const loadAgent = async ({ req, agent_id, endpoint, model_parameters }) => {
   agent.version = agent.versions ? agent.versions.length : 0;
 
   if (agent.author.toString() === req.user.id) {
+    logger.warn(`[Agent] ✅ Agent author matches user - returning agent`);
+    return agent;
+  }
+
+  // Check if this is an organization agent (from Supabase) - these should be accessible to all org users
+  if (agent.isCollaborative && !agent.projectIds) {
+    logger.warn(`[Agent] ✅ Organization agent detected (isCollaborative=true, no projectIds) - allowing access`);
     return agent;
   }
 
   if (!agent.projectIds) {
+    logger.warn(`[Agent] ❌ No projectIds and not an organization agent - denying access`);
     return null;
   }
 
@@ -313,9 +321,13 @@ const loadAgent = async ({ req, agent_id, endpoint, model_parameters }) => {
   for (const projectObjectId of agent.projectIds) {
     const projectId = projectObjectId.toString();
     if (projectId === instanceProjectId) {
+      logger.warn(`[Agent] ✅ Agent found in global project - returning agent`);
       return agent;
     }
   }
+  
+  logger.warn(`[Agent] ❌ Agent not found in any accessible projects - denying access`);
+  return null;
 };
 
 /**
