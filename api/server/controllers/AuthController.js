@@ -409,11 +409,13 @@ const ssoLibreChatController = async (req, res) => {
 
     // 6. Issue LibreChat session token (JWT) with organization context
     const tokenPayload = {
-      id: libreUser._id
+      id: libreUser._id,
+      role: libreUser.role // Include the user's role in the JWT payload
     };
 
     console.log('[SSO DEBUG] Creating JWT token payload:', {
       userId: libreUser._id,
+      userRole: libreUser.role,
       hasOrganizationData: !!organizationData,
       organizationData: organizationData
     });
