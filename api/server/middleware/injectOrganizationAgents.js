@@ -42,7 +42,8 @@ const formatAgentForLibreChat = (agent) => {
   }
 
   return {
-    id: agent.librechat_agent_id || agent.id, // Use librechat_agent_id as the primary ID
+    _id: agent.librechat_agent_id || agent.id, // LibreChat expects _id field
+    id: agent.librechat_agent_id || agent.id, // Also include id field for compatibility
     name: agent.name,
     description: agent.description || '',
     instructions: agent.instructions || '',
@@ -83,22 +84,101 @@ const injectOrganizationAgents = async (req, res, next) => {
     !req.originalUrl?.includes('/api/agents/tools') &&
     req.params?.id;
   
+  // Check if this is a chat request that might need agent lookup (POST /api/agents/chat/agents)
+  const isChatRequest = req.method === 'POST' && 
+    req.originalUrl?.includes('/api/agents/chat/agents');
+  
+  // Check if this is any agent-related request that might need validation
+  const isAgentRelated = req.originalUrl?.includes('/api/agents/');
+  
+  if (isChatRequest) {
+    logger.warn(`[AgentInjection] Chat request detected - Body:`, JSON.stringify(req.body, null, 2));
+    logger.warn(`[AgentInjection] Chat request headers:`, req.headers);
+    
+    // Check if the chat request contains an agent ID that we need to validate
+    if (req.body?.agentId) {
+      logger.warn(`[AgentInjection] Chat request with agentId: ${req.body.agentId}`);
+      
+      const organizationId = req.user?.organization_id;
+      if (organizationId) {
+        try {
+          // Check if this is one of our organization agents
+          const { data: orgAgent, error } = await supabase
+            .from('agent_library')
+            .select('*')
+            .eq('organization_id', organizationId)
+            .or(`librechat_agent_id.eq.${req.body.agentId},id.eq.${req.body.agentId}`)
+            .single();
+
+          if (!error && orgAgent) {
+            logger.warn(`[AgentInjection] ✅ Chat request for organization agent: ${orgAgent.name} (ID: ${orgAgent.id})`);
+            // The agent exists, let the request continue
+          } else {
+            logger.warn(`[AgentInjection] ❌ Chat request for unknown agent: ${req.body.agentId}`);
+          }
+        } catch (error) {
+          logger.error('[AgentInjection] Error validating agent for chat:', error);
+        }
+      }
+    }
+  }
+
   if (isSingleAgentLookup) {
     logger.warn(`[AgentInjection] Single agent lookup for ID: ${req.params.id}`);
     
     const organizationId = req.user?.organization_id;
     if (organizationId) {
       try {
-        // Try to find the agent in organization's agent_library
-        const { data: orgAgent, error } = await supabase
+        // First try to find by librechat_agent_id
+        let { data: orgAgent, error } = await supabase
           .from('agent_library')
           .select('*')
           .eq('organization_id', organizationId)
           .eq('librechat_agent_id', req.params.id)
           .single();
 
+        // If not found by librechat_agent_id, try by regular id
+        if (error || !orgAgent) {
+          logger.warn(`[AgentInjection] Not found by librechat_agent_id, trying by id`);
+          const { data: orgAgentById, error: errorById } = await supabase
+            .from('agent_library')
+            .select('*')
+            .eq('organization_id', organizationId)
+            .eq('id', req.params.id)
+            .single();
+          
+          orgAgent = orgAgentById;
+          error = errorById;
+        }
+
+        // If still not found, try to find any agent with matching name or similar ID
+        if (error || !orgAgent) {
+          logger.warn(`[AgentInjection] Not found by id either, trying broader search`);
+          const { data: allOrgAgents, error: allError } = await supabase
+            .from('agent_library')
+            .select('*')
+            .eq('organization_id', organizationId)
+            .eq('is_active', true);
+
+          if (!allError && allOrgAgents?.length > 0) {
+            logger.warn(`[AgentInjection] Found ${allOrgAgents.length} agents for organization. Looking for match...`);
+            // Log all available agents for debugging
+            allOrgAgents.forEach(agent => {
+              logger.warn(`[AgentInjection] Available agent: ID=${agent.id}, LibreChatID=${agent.librechat_agent_id}, Name=${agent.name}`);
+            });
+            
+            // Try to find a match by checking if the requested ID is similar to any agent's ID or librechat_agent_id
+            orgAgent = allOrgAgents.find(agent => 
+              agent.id === req.params.id || 
+              agent.librechat_agent_id === req.params.id ||
+              agent.id.includes(req.params.id) ||
+              req.params.id.includes(agent.id)
+            );
+          }
+        }
+
         if (!error && orgAgent) {
-          logger.warn(`[AgentInjection] ✅ Found organization agent: ${orgAgent.name}`);
+          logger.warn(`[AgentInjection] ✅ Found organization agent: ${orgAgent.name} (ID: ${orgAgent.id}, LibreChatID: ${orgAgent.librechat_agent_id})`);
           
           // Format for LibreChat and return it
           const formattedAgent = formatAgentForLibreChat(orgAgent);
@@ -125,6 +205,8 @@ const injectOrganizationAgents = async (req, res, next) => {
   res.json = async function(data) {
     try {
       logger.warn(`[AgentInjection] ===== JSON RESPONSE INTERCEPTED =====`);
+      logger.warn(`[AgentInjection] Request URL: ${req.originalUrl}`);
+      logger.warn(`[AgentInjection] Request Method: ${req.method}`);
       logger.warn(`[AgentInjection] Data type: ${typeof data}`);
       logger.warn(`[AgentInjection] Data is array: ${Array.isArray(data)}`);
       logger.warn(`[AgentInjection] Data length: ${Array.isArray(data) ? data.length : 'N/A'}`);

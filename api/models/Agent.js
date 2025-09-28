@@ -15,6 +15,66 @@ const { getCachedTools } = require('~/server/services/Config');
 const getLogStores = require('~/cache/getLogStores');
 const { getActions } = require('./Action');
 const { Agent } = require('~/db/models');
+const { createClient } = require('@supabase/supabase-js');
+
+// Initialize Supabase client for organization agent lookups
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
+);
+
+/**
+ * Format Supabase agent for LibreChat compatibility
+ * @param {Object} supabaseAgent - Agent from Supabase
+ * @returns {Object} LibreChat-compatible agent object
+ */
+const formatSupabaseAgentForLibreChat = (supabaseAgent) => {
+  // Parse JSON fields if they're strings
+  let tools = [];
+  let conversation_starters = [];
+  let model_parameters = {};
+  
+  try {
+    tools = typeof supabaseAgent.tools === 'string' ? JSON.parse(supabaseAgent.tools) : (supabaseAgent.tools || []);
+  } catch (e) {
+    logger.warn(`[Agent] Error parsing tools for agent ${supabaseAgent.name}:`, e.message);
+  }
+  
+  try {
+    conversation_starters = typeof supabaseAgent.conversation_starters === 'string' ? 
+      JSON.parse(supabaseAgent.conversation_starters) : (supabaseAgent.conversation_starters || []);
+  } catch (e) {
+    logger.warn(`[Agent] Error parsing conversation_starters for agent ${supabaseAgent.name}:`, e.message);
+  }
+  
+  try {
+    model_parameters = typeof supabaseAgent.model_parameters === 'string' ? 
+      JSON.parse(supabaseAgent.model_parameters) : (supabaseAgent.model_parameters || {});
+  } catch (e) {
+    logger.warn(`[Agent] Error parsing model_parameters for agent ${supabaseAgent.name}:`, e.message);
+  }
+
+  return {
+    id: supabaseAgent.librechat_agent_id || supabaseAgent.id,
+    name: supabaseAgent.name,
+    description: supabaseAgent.description || '',
+    instructions: supabaseAgent.instructions || '',
+    model: supabaseAgent.model || 'gpt-4',
+    provider: supabaseAgent.provider || 'openai',
+    tools: tools,
+    conversation_starters: conversation_starters,
+    model_parameters: model_parameters,
+    avatar: supabaseAgent.avatar_url ? { filepath: supabaseAgent.avatar_url } : null,
+    created_at: supabaseAgent.created_at,
+    updated_at: supabaseAgent.updated_at,
+    author: supabaseAgent.created_by,
+    version: 1,
+    isCollaborative: true,
+    projectIds: [],
+    access_level: supabaseAgent.access_level || 1,
+    recursion_limit: supabaseAgent.recursion_limit || 25
+  };
+};
 
 /**
  * Create an agent with the provided data.
@@ -46,7 +106,64 @@ const createAgent = async (agentData) => {
  * @param {string} searchParameter.author - The user ID of the agent's author.
  * @returns {Promise<Agent|null>} The agent document as a plain object, or null if not found.
  */
-const getAgent = async (searchParameter) => await Agent.findOne(searchParameter).lean();
+const getAgent = async (searchParameter) => {
+  // First try to find the agent in LibreChat's MongoDB database
+  const mongoAgent = await Agent.findOne(searchParameter).lean();
+  
+  if (mongoAgent) {
+    logger.debug(`[Agent] Found agent in MongoDB: ${mongoAgent.id}`);
+    return mongoAgent;
+  }
+  
+  // If not found in MongoDB and we have an ID, check Supabase for organization agents
+  if (searchParameter.id) {
+    try {
+      logger.debug(`[Agent] Agent not found in MongoDB, checking Supabase for ID: ${searchParameter.id}`);
+      
+      // Try to find by librechat_agent_id first, then by regular id
+      let { data: supabaseAgent, error } = await supabase
+        .from('agent_library')
+        .select('*')
+        .eq('librechat_agent_id', searchParameter.id)
+        .eq('is_active', true)
+        .single();
+
+      // If not found by librechat_agent_id, try by regular id
+      if (error || !supabaseAgent) {
+        const { data: supabaseAgentById, error: errorById } = await supabase
+          .from('agent_library')
+          .select('*')
+          .eq('id', searchParameter.id)
+          .eq('is_active', true)
+          .single();
+        
+        supabaseAgent = supabaseAgentById;
+        error = errorById;
+      }
+
+      if (!error && supabaseAgent) {
+        logger.debug(`[Agent] Found organization agent in Supabase: ${supabaseAgent.name} (ID: ${supabaseAgent.id})`);
+        
+        // Format the Supabase agent for LibreChat compatibility
+        const formattedAgent = formatSupabaseAgentForLibreChat(supabaseAgent);
+        
+        // If author is specified in search, verify access
+        if (searchParameter.author && supabaseAgent.created_by !== searchParameter.author) {
+          logger.debug(`[Agent] Author mismatch for Supabase agent. Requested: ${searchParameter.author}, Agent author: ${supabaseAgent.created_by}`);
+          return null;
+        }
+        
+        return formattedAgent;
+      } else {
+        logger.debug(`[Agent] Organization agent not found in Supabase for ID: ${searchParameter.id}`);
+      }
+    } catch (error) {
+      logger.error('[Agent] Error checking Supabase for organization agent:', error);
+    }
+  }
+  
+  return null;
+};
 
 /**
  * Load an agent based on the provided ID
