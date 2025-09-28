@@ -85,6 +85,11 @@ const injectOrganizationPrompts = async (req, res, next) => {
             data.unshift(...formattedPrompts);
             
             logger.warn(`[PromptInjection] ✅ Added ${formattedPrompts.length} organization prompts: ${formattedPrompts.map(p => p.name).join(', ')}`);
+            logger.warn(`[PromptInjection] Final data structure:`, {
+              totalPrompts: data.length,
+              firstPrompt: data[0],
+              dataKeys: Object.keys(data[0] || {})
+            });
           } else {
             logger.warn(`[PromptInjection] ❌ No prompts found or error occurred for organization ${organizationId}`);
           }
