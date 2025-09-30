@@ -212,25 +212,43 @@ const getAvailableTools = async (req, res) => {
     const cache = getLogStores(CacheKeys.CONFIG_STORE);
     const cachedTools = await cache.get(CacheKeys.TOOLS);
     if (cachedTools) {
+      console.log('🔍 [getAvailableTools] Returning cached tools:', cachedTools.length);
+      const mcpCachedTools = cachedTools.filter(p => p.pluginKey && p.pluginKey.includes(Constants.mcp_delimiter));
+      console.log('🔍 [getAvailableTools] Cached MCP tools:', mcpCachedTools.length);
       res.status(200).json(cachedTools);
       return;
     }
 
     let pluginManifest = availableTools;
+    console.log('🔍 [getAvailableTools] Starting with static tools:', pluginManifest.length);
+    
     const customConfig = await getCustomConfig();
     const mcpConfig = customConfig?.mcpServers ?? req.app.locals?.mcpConfig;
+    console.log('🔍 [getAvailableTools] MCP config found:', !!mcpConfig);
+    if (mcpConfig) {
+      console.log('🔍 [getAvailableTools] MCP config keys:', Object.keys(mcpConfig));
+    }
+    
     if (mcpConfig != null) {
       const mcpManager = getMCPManager();
       const flowsCache = getLogStores(CacheKeys.FLOWS);
       const flowManager = flowsCache ? getFlowStateManager(flowsCache) : null;
       const serverToolsCallback = createServerToolsCallback();
       const getServerTools = createGetServerTools();
+      console.log('🔍 [getAvailableTools] Loading MCP tools...');
       const mcpTools = await mcpManager.loadManifestTools({
         flowManager,
         serverToolsCallback,
         getServerTools,
       });
+      console.log('🔍 [getAvailableTools] MCP tools loaded:', mcpTools.length);
+      if (mcpTools.length > 0) {
+        console.log('🔍 [getAvailableTools] MCP tool keys:', mcpTools.map(t => t.pluginKey));
+      }
       pluginManifest = [...mcpTools, ...pluginManifest];
+      console.log('🔍 [getAvailableTools] Combined manifest size:', pluginManifest.length);
+    } else {
+      console.log('🔍 [getAvailableTools] No MCP config found');
     }
 
     /** @type {TPlugin[]} */
@@ -291,6 +309,14 @@ const getAvailableTools = async (req, res) => {
     }
 
     const finalTools = filterUniquePlugins(toolsOutput);
+    console.log('🔍 [getAvailableTools] Final tools count:', finalTools.length);
+    const mcpFinalTools = finalTools.filter(p => p.pluginKey && p.pluginKey.includes(Constants.mcp_delimiter));
+    console.log('🔍 [getAvailableTools] Final MCP tools:', mcpFinalTools.length);
+    if (mcpFinalTools.length > 0) {
+      console.log('🔍 [getAvailableTools] Final MCP tool keys:', mcpFinalTools.map(p => p.pluginKey));
+    } else {
+      console.log('🔍 [getAvailableTools] ⚠️  No MCP tools in final result!');
+    }
     await cache.set(CacheKeys.TOOLS, finalTools);
     res.status(200).json(finalTools);
   } catch (error) {
