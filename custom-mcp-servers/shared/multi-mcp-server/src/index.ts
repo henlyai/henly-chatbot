@@ -236,10 +236,9 @@ function getOrganizationIdFromContext(context: any): string {
                 context?.organizationId;
   
   if (!orgId) {
-    // Fallback to default organization ID for testing
-    const defaultOrgId = 'ad82fce8-ba9a-438f-9fe2-956a86f479a5';
-    console.log(`⚠️  Using fallback organization ID: ${defaultOrgId}`);
-    return defaultOrgId;
+    // SECURITY FIX: No fallback to default organization ID
+    // This was a critical security vulnerability
+    throw new Error('Organization ID is required but not provided in request context');
   }
   
   return orgId;

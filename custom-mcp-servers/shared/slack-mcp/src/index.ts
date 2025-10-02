@@ -50,12 +50,19 @@ async function initializeSupabase() {
 
 // Get organization ID from context
 function getOrganizationIdFromContext(context: any): string {
-  return context.headers['x-mcp-client'] || 
-         context.headers['X-MCP-Client'] || 
-         context.requestInfo?.headers['x-mcp-client'] ||
-         context.requestInfo?.headers['X-MCP-Client'] ||
-         context.organizationId ||
-         'default-org';
+  const orgId = context?.headers?.['x-mcp-client'] || 
+                context?.headers?.['X-MCP-Client'] ||
+                context?.requestInfo?.headers?.['x-mcp-client'] ||
+                context?.requestInfo?.headers?.['X-MCP-Client'] ||
+                context?.organizationId;
+  
+  if (!orgId) {
+    // SECURITY FIX: No fallback to default organization ID
+    // This was a critical security vulnerability
+    throw new Error('Organization ID is required but not provided in request context');
+  }
+  
+  return orgId;
 }
 
 // Get organization-specific Slack client

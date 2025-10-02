@@ -425,24 +425,13 @@ const ssoLibreChatController = async (req, res) => {
       tokenPayload.organization = organizationData;
       console.log('[SSO DEBUG] Added organization to JWT payload:', organizationData);
     } else {
-      // Fallback: use default organization if available
-      const defaultOrgId = process.env.DEFAULT_ORGANIZATION_ID;
-      if (defaultOrgId) {
-        tokenPayload.organization = {
-          id: defaultOrgId,
-          name: 'Default Organization',
-          domain: null,
-          marketplace: {
-            enabled: true,
-            allow_public_sharing: true,
-            max_public_agents: 10,
-            max_public_prompts: 20
-          }
-        };
-        console.log('[SSO DEBUG] Using default organization for JWT payload:', defaultOrgId);
-      } else {
-        console.log('[SSO DEBUG] No organization data to add to JWT payload and no default organization set');
-      }
+      // SECURITY FIX: Remove default organization fallback
+      // This was a critical security vulnerability
+      console.log('[SSO DEBUG] No organization data found for user');
+      return res.status(403).json({ 
+        error: 'Organization access required',
+        message: 'User must belong to an organization to access LibreChat'
+      });
     }
 
     // Generate custom JWT with organization context for marketplace  

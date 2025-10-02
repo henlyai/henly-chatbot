@@ -119,10 +119,17 @@ router.get('/', async function (req, res) {
     logger.warn(`[CONFIG DEBUG] MCP servers config: ${JSON.stringify(req.app.locals.interfaceConfig?.mcpServers, null, 2)}`);
     logger.warn(`[CONFIG DEBUG] Model specs: ${JSON.stringify(req.app.locals.modelSpecs ? Object.keys(req.app.locals.modelSpecs) : "null", null, 2)}`);
     
-    // Get user from request (you may need to adjust this based on your auth setup)
-    logger.warn("[CONFIG DEBUG] req.user:", JSON.stringify(req.user, null, 2));
-    logger.warn("[CONFIG DEBUG] DEFAULT_ORGANIZATION_ID:", process.env.DEFAULT_ORGANIZATION_ID);
-    const user = req.user || { organization_id: process.env.DEFAULT_ORGANIZATION_ID };
+    // SECURITY FIX: Remove DEFAULT_ORGANIZATION_ID fallback
+    // This was a critical security vulnerability
+    if (!req.user || !req.user.organization_id) {
+      logger.error("[SECURITY] Config route accessed without proper authentication");
+      return res.status(401).json({ 
+        error: 'Authentication required',
+        message: 'This endpoint requires proper authentication and organization context'
+      });
+    }
+    
+    const user = req.user;
     
     logger.warn("[CONFIG DEBUG] Final user object:", JSON.stringify(user, null, 2));
     

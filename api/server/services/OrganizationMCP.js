@@ -116,17 +116,19 @@ class OrganizationMCPService {
    * @returns {Promise<Object>} MCP configuration
    */
   async getUserMCPConfig(user) {
+    // SECURITY FIX: Require organization_id - no fallback to default
     if (!user?.organization_id) {
-      logger.warn('[OrganizationMCP] No organization_id found for user, using default config');
-      return this.getDefaultMCPConfig();
+      logger.error('[OrganizationMCP] No organization_id found for user - authentication required');
+      throw new Error('Organization ID is required for MCP configuration');
     }
 
     const orgConfig = await this.getOrganizationMCPServers(user.organization_id);
     
-    // Fallback to default if no organization-specific config
+    // Return empty config if no organization-specific MCPs
+    // This is safer than falling back to default config
     if (Object.keys(orgConfig).length === 0) {
-      logger.warn(`[OrganizationMCP] No MCP servers found for organization ${user.organization_id}, using default`);
-      return this.getDefaultMCPConfig();
+      logger.info(`[OrganizationMCP] No MCP servers found for organization ${user.organization_id}`);
+      return {};
     }
 
     return orgConfig;
